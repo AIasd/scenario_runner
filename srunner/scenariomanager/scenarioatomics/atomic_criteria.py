@@ -786,7 +786,7 @@ class OnSidewalkTest(Criterion):
         """
         # If currently at a sidewalk, register the event
         if self._onsidewalk_active:
-
+            print('-'*100, '_onsidewalk_active')
             self.actual_value += 1
 
             onsidewalk_event = TrafficEvent(event_type=TrafficEventType.ON_SIDEWALK_INFRACTION)
@@ -801,7 +801,7 @@ class OnSidewalkTest(Criterion):
 
         # If currently outside of our lane, register the event
         if self._outside_lane_active:
-
+            print('-'*100, '_outside_lane_active')
             self.actual_value += 1
 
             outsidelane_event = TrafficEvent(event_type=TrafficEventType.OUTSIDE_LANE_INFRACTION)
@@ -813,6 +813,9 @@ class OnSidewalkTest(Criterion):
             self._outside_lane_active = False
             self._wrong_outside_lane_distance = 0
             self.list_traffic_events.append(outsidelane_event)
+        # addition: new event
+        blackv = py_trees.blackboard.Blackboard()
+        _ = blackv.set("OnSideWalk", self.actual_value)
 
         super(OnSidewalkTest, self).terminate(new_status)
 
@@ -1183,6 +1186,10 @@ class WrongLaneTest(Criterion):
             self._in_lane = True
             self.list_traffic_events.append(wrong_way_event)
 
+        # addition: new event
+        blackv = py_trees.blackboard.Blackboard()
+        _ = blackv.set("WrongLane", self.actual_value)
+
         super(WrongLaneTest, self).terminate(new_status)
 
     def _set_event_message(self, event, location, distance, road_id, lane_id):
@@ -1349,7 +1356,9 @@ class InRouteTest(Criterion):
             if shortest_distance < self._offroad_max:
                 off_route = False
                 in_safe_route = bool(shortest_distance < self._offroad_min)
-
+            # addition: to fix "local variable 'in_safe_route' referenced before assignment"
+            else:
+                in_safe_route = False
             # If actor advanced a step, record the distance
             if self._current_index != closest_index:
 

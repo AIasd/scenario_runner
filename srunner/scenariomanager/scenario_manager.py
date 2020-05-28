@@ -199,12 +199,11 @@ class ScenarioManager(object):
         Trigger the start of the scenario and wait for it to finish/fail
         """
         print("ScenarioManager: Running scenario {}".format(self.scenario_tree.name))
+
         self.start_system_time = time.time()
         start_game_time = GameTime.get_time()
-
         self._watchdog.start()
         self._running = True
-
         while self._running:
             timestamp = None
             world = CarlaDataProvider.get_world()
@@ -269,6 +268,8 @@ class ScenarioManager(object):
 
             if self._agent is not None:
                 self.ego_vehicles[0].apply_control(ego_action)
+
+
 
         if self._agent and self._running and self._watchdog.get_status():
             CarlaDataProvider.perform_carla_tick(self._timeout)
