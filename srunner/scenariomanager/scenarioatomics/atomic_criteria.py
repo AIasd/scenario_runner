@@ -478,9 +478,7 @@ class ActorSpeedAboveThresholdTest(Criterion):
         Sets the message of the event
         """
 
-        event.set_message('Agent got blocked at (x={}, y={}, z={})'.format(round(location.x, 3),
-                                                                           round(location.y, 3),
-                                                                           round(location.z, 3)))
+        event.set_message('Agent got blocked at (x={}, y={}, z={})'.format(round(location.x, 3), round(location.y, 3), round(location.z, 3)))
 
     @staticmethod
     def _set_event_dict(event, location):
@@ -751,9 +749,17 @@ class OnSidewalkTest(Criterion):
 
             self.actual_value += 1
 
+
+
+
             onsidewalk_event = TrafficEvent(event_type=TrafficEventType.ON_SIDEWALK_INFRACTION)
+
+            # modification
+            # self._set_event_message(
+            #     onsidewalk_event, self._sidewalk_start_location, self._wrong_sidewalk_distance)
+            vehicle_location = CarlaDataProvider.get_location(self._actor)
             self._set_event_message(
-                onsidewalk_event, self._sidewalk_start_location, self._wrong_sidewalk_distance)
+                onsidewalk_event, vehicle_location, self._wrong_sidewalk_distance)
             self._set_event_dict(
                 onsidewalk_event, self._sidewalk_start_location, self._wrong_sidewalk_distance)
 
@@ -767,8 +773,14 @@ class OnSidewalkTest(Criterion):
             self.actual_value += 1
 
             outsidelane_event = TrafficEvent(event_type=TrafficEventType.OUTSIDE_LANE_INFRACTION)
+
+            # modification
+            # self._set_event_message(
+            #     outsidelane_event, self._outside_lane_start_location, self._wrong_outside_lane_distance)
+            vehicle_location = CarlaDataProvider.get_location(self._actor)
             self._set_event_message(
-                outsidelane_event, self._outside_lane_start_location, self._wrong_outside_lane_distance)
+                outsidelane_event, vehicle_location, self._wrong_outside_lane_distance)
+
             self._set_event_dict(
                 outsidelane_event, self._outside_lane_start_location, self._wrong_outside_lane_distance)
 
@@ -790,8 +802,14 @@ class OnSidewalkTest(Criterion):
             self.actual_value += 1
 
             onsidewalk_event = TrafficEvent(event_type=TrafficEventType.ON_SIDEWALK_INFRACTION)
+
+            # modification
+            # self._set_event_message(
+            #     onsidewalk_event, self._sidewalk_start_location, self._wrong_sidewalk_distance)
+            vehicle_location = CarlaDataProvider.get_location(self._actor)
             self._set_event_message(
-                onsidewalk_event, self._sidewalk_start_location, self._wrong_sidewalk_distance)
+                onsidewalk_event, vehicle_location, self._wrong_sidewalk_distance)
+
             self._set_event_dict(
                 onsidewalk_event, self._sidewalk_start_location, self._wrong_sidewalk_distance)
 
@@ -805,8 +823,14 @@ class OnSidewalkTest(Criterion):
             self.actual_value += 1
 
             outsidelane_event = TrafficEvent(event_type=TrafficEventType.OUTSIDE_LANE_INFRACTION)
+
+            # modification
+            # self._set_event_message(
+            #     outsidelane_event, self._outside_lane_start_location, self._wrong_outside_lane_distance)
+            vehicle_location = CarlaDataProvider.get_location(self._actor)
             self._set_event_message(
-                outsidelane_event, self._outside_lane_start_location, self._wrong_outside_lane_distance)
+                outsidelane_event, vehicle_location, self._wrong_outside_lane_distance)
+
             self._set_event_dict(
                 outsidelane_event, self._outside_lane_start_location, self._wrong_outside_lane_distance)
 
@@ -1149,8 +1173,13 @@ class WrongLaneTest(Criterion):
         if self._in_lane and self._wrong_distance > 0:
 
             wrong_way_event = TrafficEvent(event_type=TrafficEventType.WRONG_WAY_INFRACTION)
-            self._set_event_message(wrong_way_event, self._wrong_lane_start_location,
-                                    self._wrong_distance, current_road_id, current_lane_id)
+
+
+            # modification
+            # self._set_event_message(wrong_way_event, self._wrong_lane_start_location, self._wrong_distance, current_road_id, current_lane_id)
+            vehicle_location = CarlaDataProvider.get_location(self._actor)
+            self._set_event_message(wrong_way_event, vehicle_location, self._wrong_distance, current_road_id, current_lane_id)
+
             self._set_event_dict(wrong_way_event, self._wrong_lane_start_location,
                                  self._wrong_distance, current_road_id, current_lane_id)
 
@@ -1177,8 +1206,12 @@ class WrongLaneTest(Criterion):
             current_road_id = lane_waypoint.road_id
 
             wrong_way_event = TrafficEvent(event_type=TrafficEventType.WRONG_WAY_INFRACTION)
-            self._set_event_message(wrong_way_event, self._wrong_lane_start_location,
-                                    self._wrong_distance, current_road_id, current_lane_id)
+
+            # modification
+            # self._set_event_message(wrong_way_event, self._wrong_lane_start_location, self._wrong_distance, current_road_id, current_lane_id)
+            vehicle_location = CarlaDataProvider.get_location(self._actor)
+            self._set_event_message(wrong_way_event, vehicle_location, self._wrong_distance, current_road_id, current_lane_id)
+
             self._set_event_dict(wrong_way_event, self._wrong_lane_start_location,
                                  self._wrong_distance, current_road_id, current_lane_id)
 
@@ -1617,7 +1650,10 @@ class RunningRedLightTest(Criterion):
 
                         self.test_status = "FAILURE"
                         self.actual_value += 1
-                        location = traffic_light.get_transform().location
+
+                        # modification
+                        # location = traffic_light.get_transform().location
+
                         red_light_event = TrafficEvent(event_type=TrafficEventType.TRAFFIC_LIGHT_INFRACTION)
                         red_light_event.set_message(
                             "Agent ran a red light {} at (x={}, y={}, z={})".format(
@@ -1842,17 +1878,20 @@ class RunningStopTest(Criterion):
                     self.test_status = "FAILURE"
                     stop_location = self._target_stop_sign.get_transform().location
                     running_stop_event = TrafficEvent(event_type=TrafficEventType.STOP_INFRACTION)
+
+
+                    # modification: stop_location -> location
                     running_stop_event.set_message(
                         "Agent ran a stop with id={} at (x={}, y={}, z={})".format(
                             self._target_stop_sign.id,
-                            round(stop_location.x, 3),
-                            round(stop_location.y, 3),
-                            round(stop_location.z, 3)))
+                            round(location.x, 3),
+                            round(location.y, 3),
+                            round(location.z, 3)))
                     running_stop_event.set_dict({
                         'id': self._target_stop_sign.id,
-                        'x': stop_location.x,
-                        'y': stop_location.y,
-                        'z': stop_location.z})
+                        'x': location.x,
+                        'y': location.y,
+                        'z': location.z})
 
                     self.list_traffic_events.append(running_stop_event)
 
