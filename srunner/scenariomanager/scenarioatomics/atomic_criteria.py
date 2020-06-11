@@ -27,6 +27,7 @@ from srunner.scenariomanager.carla_data_provider import CarlaDataProvider
 from srunner.scenariomanager.timer import GameTime
 from srunner.scenariomanager.traffic_events import TrafficEvent, TrafficEventType
 
+ROUND_PREC = 14
 
 class Criterion(py_trees.behaviour.Behaviour):
 
@@ -359,6 +360,57 @@ class CollisionTest(Criterion):
         """
         Callback to update collision count
         """
+
+        # addition
+        def rotate(origin, point, angle):
+            """
+            Rotate a point counterclockwise by a given angle around a given origin and return the difference between the rotated point and the origin dx, dy.
+
+            The angle should be given in degrees.
+            """
+            angle = math.radians(angle)
+            ox, oy = origin
+            px, py = point
+
+            dx = math.cos(angle) * (px - ox) - math.sin(angle) * (py - oy)
+            dy = math.sin(angle) * (px - ox) + math.cos(angle) * (py - oy)
+            return dx, dy
+
+        def area(x1, y1, x2, y2, x3, y3):
+            return abs((x1 * (y2 - y3) + x2 * (y3 - y1)
+                        + x3 * (y1 - y2)) / 2.0)
+
+
+        # A function to check whether point point falls into the triangle formed
+        # by left_point, right_point, and origin
+        def inside_triangle(left_point, right_point, origin, point):
+            x1, y1 = left_point
+            x2, y2 = right_point
+            x3, y3 = origin
+            x, y = point
+
+            # Calculate area of triangle ABC
+            A = area (x1, y1, x2, y2, x3, y3)
+
+            # Calculate area of triangle PBC
+            A1 = area (x, y, x2, y2, x3, y3)
+
+            # Calculate area of triangle PAC
+            A2 = area (x1, y1, x, y, x3, y3)
+
+            # Calculate area of triangle PAB
+            A3 = area (x1, y1, x2, y2, x, y)
+
+            # Check if sum of A1, A2 and A3
+            # is same as A
+            if (A == A1 + A2 + A3):
+                return True
+            else:
+                return False
+
+
+
+
         self = weak_self()
         if not self:
             return
@@ -386,20 +438,94 @@ class CollisionTest(Criterion):
                     registered = True
                     break
 
+
+
+
+        is_record = False
+        visible = False
         # Register it if needed
         if not registered:
-            self.actual_value += 1
-            self.last_id = event.other_actor.id
 
-            if ('static' in event.other_actor.type_id or 'traffic' in event.other_actor.type_id) \
-                    and 'sidewalk' not in event.other_actor.type_id:
+            # modification: remove the second and part of if ('static' in event.other_actor.type_id or 'traffic' in event.other_actor.type_id) and 'sidewalk' not in event.other_actor.type_id
+            if ('static' in event.other_actor.type_id or 'traffic' in event.other_actor.type_id):
                 actor_type = TrafficEventType.COLLISION_STATIC
+                visible = True
+
+            elif 'walker' in event.other_actor.type_id:
+                actor_type = TrafficEventType.COLLISION_PEDESTRIAN
+                visible = True
 
             elif 'vehicle' in event.other_actor.type_id:
                 actor_type = TrafficEventType.COLLISION_VEHICLE
 
-            elif 'walker' in event.other_actor.type_id:
-                actor_type = TrafficEventType.COLLISION_PEDESTRIAN
+                # modification: check visibility here
+                # visible only when the collided object is within the 90 degrees
+                # forward visual cone
+
+                # Get the information of ego vehicle
+                ego_tra = CarlaDataProvider.get_transform(self._actor)
+                ego_loc = ego_tra.location
+                ego_heading_vec = ego_tra.get_forward_vector()
+                ego_heading_vec.z = 0
+                ego_heading_vec = ego_heading_vec / math.sqrt(math.pow(ego_heading_vec.x, 2) + math.pow(ego_heading_vec.y, 2))
+
+                current_tra = event.other_actor.get_transform()
+                current_loc = current_tra.location
+
+                # Get the vertices of the other vehicle
+                heading_vec = current_tra.get_forward_vector()
+                heading_vec.z = 0
+                heading_vec = heading_vec / math.sqrt(math.pow(heading_vec.x, 2) + math.pow(heading_vec.y, 2))
+                perpendicular_vec = carla.Vector3D(-heading_vec.y, heading_vec.x, 0)
+
+                extent = event.other_actor.bounding_box.extent
+                x_boundary_vector = heading_vec * extent.x
+                y_boundary_vector = perpendicular_vec * extent.y
+
+                bbox = [
+                    current_loc + carla.Location(x_boundary_vector - y_boundary_vector),
+                    current_loc + carla.Location(x_boundary_vector + y_boundary_vector),
+                    current_loc + carla.Location(-1 * x_boundary_vector - y_boundary_vector),
+                    current_loc + carla.Location(-1 * x_boundary_vector + y_boundary_vector)]
+
+                # dx, dy, dyaw
+                cameras_pos_offsets = [(1.3, 0.0, 0), (1.2, -0.25, -45), (1.2, 0.25, 45)]
+
+
+                for offsets in cameras_pos_offsets:
+                    qx, qy, qyaw = offsets
+                    origin = (ego_loc.x+qx, ego_loc.y+qy)
+                    point = (origin[0]+ego_heading_vec.x, origin[1]+ego_heading_vec.y)
+                    dxl, dyl = rotate(origin, point, -45+qyaw)
+                    dxr, dyr = rotate(origin, point, 45+qyaw)
+
+                    length = 300
+
+                    left_point = (origin[0] + dxl * length, origin[1] + dyl * length)
+                    right_point = (origin[0] + dxr * length, origin[1] + dyr * length)
+
+                    for bb in bbox:
+                        point = (bb.x, bb.y)
+                        print('bbox', left_point, right_point, origin, point)
+                        if inside_triangle(left_point, right_point, origin, point):
+                            visible = True
+                            print('hit')
+                            break
+                    if visible:
+                        break
+
+            else:
+                print(event.other_actor.type_id)
+
+
+            if not visible:
+                print('miss'*100)
+                actor_type = TrafficEventType.COLLISION_INVISIBLE
+
+
+
+            self.actual_value += 1
+            self.last_id = event.other_actor.id
 
             collision_event = TrafficEvent(event_type=actor_type)
             collision_event.set_dict({
@@ -412,9 +538,9 @@ class CollisionTest(Criterion):
                 "Agent collided against object with type={} and id={} at (x={}, y={}, z={})".format(
                     event.other_actor.type_id,
                     event.other_actor.id,
-                    round(actor_location.x, 3),
-                    round(actor_location.y, 3),
-                    round(actor_location.z, 3)))
+                    round(actor_location.x, ROUND_PREC),
+                    round(actor_location.y, ROUND_PREC),
+                    round(actor_location.z, ROUND_PREC)))
 
             self.registered_collisions.append(actor_location)
             self.list_traffic_events.append(collision_event)
@@ -754,12 +880,8 @@ class OnSidewalkTest(Criterion):
 
             onsidewalk_event = TrafficEvent(event_type=TrafficEventType.ON_SIDEWALK_INFRACTION)
 
-            # modification
-            # self._set_event_message(
-            #     onsidewalk_event, self._sidewalk_start_location, self._wrong_sidewalk_distance)
-            vehicle_location = CarlaDataProvider.get_location(self._actor)
             self._set_event_message(
-                onsidewalk_event, vehicle_location, self._wrong_sidewalk_distance)
+                onsidewalk_event, self._sidewalk_start_location, self._wrong_sidewalk_distance)
             self._set_event_dict(
                 onsidewalk_event, self._sidewalk_start_location, self._wrong_sidewalk_distance)
 
@@ -774,12 +896,8 @@ class OnSidewalkTest(Criterion):
 
             outsidelane_event = TrafficEvent(event_type=TrafficEventType.OUTSIDE_LANE_INFRACTION)
 
-            # modification
-            # self._set_event_message(
-            #     outsidelane_event, self._outside_lane_start_location, self._wrong_outside_lane_distance)
-            vehicle_location = CarlaDataProvider.get_location(self._actor)
             self._set_event_message(
-                outsidelane_event, vehicle_location, self._wrong_outside_lane_distance)
+                outsidelane_event, self._outside_lane_start_location, self._wrong_outside_lane_distance)
 
             self._set_event_dict(
                 outsidelane_event, self._outside_lane_start_location, self._wrong_outside_lane_distance)
@@ -855,10 +973,10 @@ class OnSidewalkTest(Criterion):
         event.set_message(
             '{} for about {} meters, starting at (x={}, y={}, z={})'.format(
                 message_start,
-                round(distance, 3),
-                round(location.x, 3),
-                round(location.y, 3),
-                round(location.z, 3)))
+                round(distance, ROUND_PREC),
+                round(location.x, ROUND_PREC),
+                round(location.y, ROUND_PREC),
+                round(location.z, ROUND_PREC)))
 
     def _set_event_dict(self, event, location, distance):
         """
@@ -1175,10 +1293,7 @@ class WrongLaneTest(Criterion):
             wrong_way_event = TrafficEvent(event_type=TrafficEventType.WRONG_WAY_INFRACTION)
 
 
-            # modification
-            # self._set_event_message(wrong_way_event, self._wrong_lane_start_location, self._wrong_distance, current_road_id, current_lane_id)
-            vehicle_location = CarlaDataProvider.get_location(self._actor)
-            self._set_event_message(wrong_way_event, vehicle_location, self._wrong_distance, current_road_id, current_lane_id)
+            self._set_event_message(wrong_way_event, self._wrong_lane_start_location, self._wrong_distance, current_road_id, current_lane_id)
 
             self._set_event_dict(wrong_way_event, self._wrong_lane_start_location,
                                  self._wrong_distance, current_road_id, current_lane_id)
@@ -1207,10 +1322,7 @@ class WrongLaneTest(Criterion):
 
             wrong_way_event = TrafficEvent(event_type=TrafficEventType.WRONG_WAY_INFRACTION)
 
-            # modification
-            # self._set_event_message(wrong_way_event, self._wrong_lane_start_location, self._wrong_distance, current_road_id, current_lane_id)
-            vehicle_location = CarlaDataProvider.get_location(self._actor)
-            self._set_event_message(wrong_way_event, vehicle_location, self._wrong_distance, current_road_id, current_lane_id)
+            self._set_event_message(wrong_way_event, self._wrong_lane_start_location, self._wrong_distance, current_road_id, current_lane_id)
 
             self._set_event_dict(wrong_way_event, self._wrong_lane_start_location,
                                  self._wrong_distance, current_road_id, current_lane_id)
@@ -1233,10 +1345,10 @@ class WrongLaneTest(Criterion):
         event.set_message(
             "Agent invaded a lane in opposite direction for {} meters, starting at (x={}, y={}, z={}). "
             "road_id={}, lane_id={}".format(
-                round(distance, 3),
-                round(location.x, 3),
-                round(location.y, 3),
-                round(location.z, 3),
+                round(distance, ROUND_PREC),
+                round(location.x, ROUND_PREC),
+                round(location.y, ROUND_PREC),
+                round(location.z, ROUND_PREC),
                 road_id,
                 lane_id))
 
@@ -1414,9 +1526,9 @@ class InRouteTest(Criterion):
                 route_deviation_event = TrafficEvent(event_type=TrafficEventType.ROUTE_DEVIATION)
                 route_deviation_event.set_message(
                     "Agent deviated from the route at (x={}, y={}, z={})".format(
-                        round(location.x, 3),
-                        round(location.y, 3),
-                        round(location.z, 3)))
+                        round(location.x, ROUND_PREC),
+                        round(location.y, ROUND_PREC),
+                        round(location.z, ROUND_PREC)))
                 route_deviation_event.set_dict({
                     'x': location.x,
                     'y': location.y,
@@ -1653,14 +1765,15 @@ class RunningRedLightTest(Criterion):
 
                         # modification
                         # location = traffic_light.get_transform().location
+                        location = CarlaDataProvider.get_location(self._actor)
 
                         red_light_event = TrafficEvent(event_type=TrafficEventType.TRAFFIC_LIGHT_INFRACTION)
                         red_light_event.set_message(
                             "Agent ran a red light {} at (x={}, y={}, z={})".format(
                                 traffic_light.id,
-                                round(location.x, 3),
-                                round(location.y, 3),
-                                round(location.z, 3)))
+                                round(location.x, ROUND_PREC),
+                                round(location.y, ROUND_PREC),
+                                round(location.z, ROUND_PREC)))
                         red_light_event.set_dict({
                             'id': traffic_light.id,
                             'x': location.x,
@@ -1880,13 +1993,15 @@ class RunningStopTest(Criterion):
                     running_stop_event = TrafficEvent(event_type=TrafficEventType.STOP_INFRACTION)
 
 
-                    # modification: stop_location -> location
+                    # modification
+                    location = CarlaDataProvider.get_location(self._actor)
+
                     running_stop_event.set_message(
                         "Agent ran a stop with id={} at (x={}, y={}, z={})".format(
                             self._target_stop_sign.id,
-                            round(location.x, 3),
-                            round(location.y, 3),
-                            round(location.z, 3)))
+                            round(location.x, ROUND_PREC),
+                            round(location.y, ROUND_PREC),
+                            round(location.z, ROUND_PREC)))
                     running_stop_event.set_dict({
                         'id': self._target_stop_sign.id,
                         'x': location.x,

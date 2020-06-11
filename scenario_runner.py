@@ -75,7 +75,7 @@ class ScenarioRunner(object):
     # Tunable parameters
     client_timeout = 10.0  # in seconds
     wait_for_world = 20.0  # in seconds
-    frame_rate = 20.0      # in Hz
+    frame_rate = 10.0      # in Hz
 
     # CARLA world and scenario handlers
     world = None
