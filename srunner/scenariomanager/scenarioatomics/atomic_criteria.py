@@ -506,10 +506,10 @@ class CollisionTest(Criterion):
 
                     for bb in bbox:
                         point = (bb.x, bb.y)
-                        print('bbox', left_point, right_point, origin, point)
+                        # print('bbox', left_point, right_point, origin, point)
                         if inside_triangle(left_point, right_point, origin, point):
                             visible = True
-                            print('hit')
+                            # print('hit')
                             break
                     if visible:
                         break
@@ -519,7 +519,7 @@ class CollisionTest(Criterion):
 
 
             if not visible:
-                print('miss'*100)
+                # print('miss'*100)
                 actor_type = TrafficEventType.COLLISION_INVISIBLE
 
 
