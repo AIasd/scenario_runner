@@ -851,6 +851,8 @@ class OnSidewalkTest(Criterion):
         self._prev_time = None
         self._time_outside_lanes = 0
 
+        self.actual_value = 0
+
     def update(self):
         """
         First, transforms the actor's current position as well as its four corners to their
@@ -1333,6 +1335,8 @@ class WrongLaneTest(Criterion):
         self._actor_location = self._actor.get_location()
         self._previous_lane_waypoint = self._map.get_waypoint(self._actor.get_location())
         self._wrong_lane_start_location = None
+
+        self.actual_value = 0
 
     def update(self):
         """
