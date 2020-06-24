@@ -208,10 +208,7 @@ class VehicleTurningRight(BasicScenario):
         bycicle_start_dist = 13 + dist_to_travel
 
         if self._ego_route is not None:
-            trigger_distance = InTriggerDistanceToLocationAlongRoute(self.ego_vehicles[0],
-                                                                     self._ego_route,
-                                                                     self._other_actor_transform.location,
-                                                                     bycicle_start_dist)
+            trigger_distance = InTriggerDistanceToLocationAlongRoute(self.ego_vehicles[0], self._ego_route, self._other_actor_transform.location, bycicle_start_dist)
         else:
             trigger_distance = InTriggerDistanceToVehicle(self.other_actors[0],
                                                           self.ego_vehicles[0],
