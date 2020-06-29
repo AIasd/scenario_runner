@@ -40,13 +40,7 @@ from srunner.scenarios.other_leading_vehicle import OtherLeadingVehicle
 from srunner.scenarios.maneuver_opposite_direction import ManeuverOppositeDirection
 from srunner.scenarios.junction_crossing_route import SignalJunctionCrossingRoute, NoSignalJunctionCrossingRoute
 
-from srunner.scenariomanager.scenarioatomics.atomic_criteria import (CollisionTest,
-                                                                     InRouteTest,
-                                                                     RouteCompletionTest,
-                                                                     OutsideRouteLanesTest,
-                                                                     RunningRedLightTest,
-                                                                     RunningStopTest,
-                                                                     ActorSpeedAboveThresholdTest)
+from srunner.scenariomanager.scenarioatomics.atomic_criteria import (CollisionTest, InRouteTest, RouteCompletionTest, OutsideRouteLanesTest, RunningRedLightTest, RunningStopTest, ActorSpeedAboveThresholdTest)
 
 SECONDS_GIVEN_PER_METERS = 0.4
 
