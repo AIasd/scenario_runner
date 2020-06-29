@@ -455,121 +455,110 @@ class CollisionTest(Criterion):
                 return
 
 
+        visible = False
+
+        # modification: remove the second and part of if ('static' in event.other_actor.type_id or 'traffic' in event.other_actor.type_id) and 'sidewalk' not in event.other_actor.type_id
+        if ('static' in event.other_actor.type_id or 'traffic' in event.other_actor.type_id):
+            actor_type = TrafficEventType.COLLISION_STATIC
+            visible = True
+
+        elif 'walker' in event.other_actor.type_id:
+            actor_type = TrafficEventType.COLLISION_PEDESTRIAN
+            visible = True
+
+        elif 'vehicle' in event.other_actor.type_id:
+            actor_type = TrafficEventType.COLLISION_VEHICLE
+
+            # modification: check visibility here
+            # visible only when the collided object is within the 90 degrees
+            # forward visual cone
+
+            # Get the information of ego vehicle
+            ego_tra = CarlaDataProvider.get_transform(self._actor)
+            ego_loc = ego_tra.location
+            ego_heading_vec = ego_tra.get_forward_vector()
+            ego_heading_vec.z = 0
+            ego_heading_vec = ego_heading_vec / math.sqrt(math.pow(ego_heading_vec.x, 2) + math.pow(ego_heading_vec.y, 2))
+
+            current_tra = event.other_actor.get_transform()
+            current_loc = current_tra.location
+
+            # Get the vertices of the other vehicle
+            heading_vec = current_tra.get_forward_vector()
+            heading_vec.z = 0
+            heading_vec = heading_vec / math.sqrt(math.pow(heading_vec.x, 2) + math.pow(heading_vec.y, 2))
+            perpendicular_vec = carla.Vector3D(-heading_vec.y, heading_vec.x, 0)
+
+            extent = event.other_actor.bounding_box.extent
+            x_boundary_vector = heading_vec * extent.x
+            y_boundary_vector = perpendicular_vec * extent.y
+
+            bbox = [
+                current_loc + carla.Location(x_boundary_vector - y_boundary_vector),
+                current_loc + carla.Location(x_boundary_vector + y_boundary_vector),
+                current_loc + carla.Location(-1 * x_boundary_vector - y_boundary_vector),
+                current_loc + carla.Location(-1 * x_boundary_vector + y_boundary_vector)]
+
+            # dx, dy, dyaw
+            cameras_pos_offsets = [(1.3, 0.0, 0), (1.2, -0.25, -45), (1.2, 0.25, 45)]
+
+
+            for offsets in cameras_pos_offsets:
+                qx, qy, qyaw = offsets
+                origin = (ego_loc.x+qx, ego_loc.y+qy)
+                point = (origin[0]+ego_heading_vec.x, origin[1]+ego_heading_vec.y)
+                dxl, dyl = rotate(origin, point, -45+qyaw)
+                dxr, dyr = rotate(origin, point, 45+qyaw)
+
+                length = 300
+
+                left_point = (origin[0] + dxl * length, origin[1] + dyl * length)
+                right_point = (origin[0] + dxr * length, origin[1] + dyr * length)
+
+                for bb in bbox:
+                    point = (bb.x, bb.y)
+                    # print('bbox', left_point, right_point, origin, point)
+                    if inside_triangle(left_point, right_point, origin, point):
+                        visible = True
+                        # print('hit')
+                        break
+                if visible:
+                    break
+        else:
+            print(event.other_actor.type_id)
+            return
+
+        if not visible:
+            # print('miss'*100)
+            actor_type = TrafficEventType.COLLISION_INVISIBLE
+
+
+        collision_event = TrafficEvent(event_type=actor_type)
+        collision_event.set_dict({
+            'type': event.other_actor.type_id,
+            'id': event.other_actor.id,
+            'x': actor_location.x,
+            'y': actor_location.y,
+            'z': actor_location.z})
+        collision_event.set_message(
+            "Agent collided against object with type={} and id={} at (x={}, y={}, z={})".format(
+                event.other_actor.type_id,
+                event.other_actor.id,
+                round(actor_location.x, ROUND_PREC),
+                round(actor_location.y, ROUND_PREC),
+                round(actor_location.z, ROUND_PREC)))
 
         self.test_status = "FAILURE"
+        self.actual_value += 1
         self.collision_time = GameTime.get_time()
 
+        self.registered_collisions.append(actor_location)
+        self.list_traffic_events.append(collision_event)
 
 
 
-        is_record = False
-        visible = False
-        # Register it if needed
-        if not registered:
-
-            self.actual_value += 1
-            if event.other_actor.id != 0:  # Number 0: static objects -> ignore it
-                self.last_id = event.other_actor.id
-
-            # modification: remove the second and part of if ('static' in event.other_actor.type_id or 'traffic' in event.other_actor.type_id) and 'sidewalk' not in event.other_actor.type_id
-            if ('static' in event.other_actor.type_id or 'traffic' in event.other_actor.type_id):
-                actor_type = TrafficEventType.COLLISION_STATIC
-                visible = True
-
-            elif 'walker' in event.other_actor.type_id:
-                actor_type = TrafficEventType.COLLISION_PEDESTRIAN
-                visible = True
-
-            elif 'vehicle' in event.other_actor.type_id:
-                actor_type = TrafficEventType.COLLISION_VEHICLE
-
-                # modification: check visibility here
-                # visible only when the collided object is within the 90 degrees
-                # forward visual cone
-
-                # Get the information of ego vehicle
-                ego_tra = CarlaDataProvider.get_transform(self._actor)
-                ego_loc = ego_tra.location
-                ego_heading_vec = ego_tra.get_forward_vector()
-                ego_heading_vec.z = 0
-                ego_heading_vec = ego_heading_vec / math.sqrt(math.pow(ego_heading_vec.x, 2) + math.pow(ego_heading_vec.y, 2))
-
-                current_tra = event.other_actor.get_transform()
-                current_loc = current_tra.location
-
-                # Get the vertices of the other vehicle
-                heading_vec = current_tra.get_forward_vector()
-                heading_vec.z = 0
-                heading_vec = heading_vec / math.sqrt(math.pow(heading_vec.x, 2) + math.pow(heading_vec.y, 2))
-                perpendicular_vec = carla.Vector3D(-heading_vec.y, heading_vec.x, 0)
-
-                extent = event.other_actor.bounding_box.extent
-                x_boundary_vector = heading_vec * extent.x
-                y_boundary_vector = perpendicular_vec * extent.y
-
-                bbox = [
-                    current_loc + carla.Location(x_boundary_vector - y_boundary_vector),
-                    current_loc + carla.Location(x_boundary_vector + y_boundary_vector),
-                    current_loc + carla.Location(-1 * x_boundary_vector - y_boundary_vector),
-                    current_loc + carla.Location(-1 * x_boundary_vector + y_boundary_vector)]
-
-                # dx, dy, dyaw
-                cameras_pos_offsets = [(1.3, 0.0, 0), (1.2, -0.25, -45), (1.2, 0.25, 45)]
-
-
-                for offsets in cameras_pos_offsets:
-                    qx, qy, qyaw = offsets
-                    origin = (ego_loc.x+qx, ego_loc.y+qy)
-                    point = (origin[0]+ego_heading_vec.x, origin[1]+ego_heading_vec.y)
-                    dxl, dyl = rotate(origin, point, -45+qyaw)
-                    dxr, dyr = rotate(origin, point, 45+qyaw)
-
-                    length = 300
-
-                    left_point = (origin[0] + dxl * length, origin[1] + dyl * length)
-                    right_point = (origin[0] + dxr * length, origin[1] + dyr * length)
-
-                    for bb in bbox:
-                        point = (bb.x, bb.y)
-                        # print('bbox', left_point, right_point, origin, point)
-                        if inside_triangle(left_point, right_point, origin, point):
-                            visible = True
-                            # print('hit')
-                            break
-                    if visible:
-                        break
-
-            else:
-                print(event.other_actor.type_id)
-
-
-            if not visible:
-                # print('miss'*100)
-                actor_type = TrafficEventType.COLLISION_INVISIBLE
-
-
-
-
-
-
-            collision_event = TrafficEvent(event_type=actor_type)
-            collision_event.set_dict({
-                'type': event.other_actor.type_id,
-                'id': event.other_actor.id,
-                'x': actor_location.x,
-                'y': actor_location.y,
-                'z': actor_location.z})
-            collision_event.set_message(
-                "Agent collided against object with type={} and id={} at (x={}, y={}, z={})".format(
-                    event.other_actor.type_id,
-                    event.other_actor.id,
-                    round(actor_location.x, ROUND_PREC),
-                    round(actor_location.y, ROUND_PREC),
-                    round(actor_location.z, ROUND_PREC)))
-
-            self.registered_collisions.append(actor_location)
-            self.list_traffic_events.append(collision_event)
-
+        if event.other_actor.id != 0:  # Number 0: static objects -> ignore it
+            self.last_id = event.other_actor.id
 
 class ActorSpeedAboveThresholdTest(Criterion):
 
