@@ -41,7 +41,7 @@ class ScenarioManager(object):
     5. If needed, cleanup with manager.stop_scenario()
     """
 
-    def __init__(self, debug_mode=False, timeout=2.0):
+    def __init__(self, debug_mode=False, sync_mode=False, timeout=2.0):
         """
         Setups up the parameters, which will be filled at load_scenario()
 
@@ -54,6 +54,7 @@ class ScenarioManager(object):
 
         self._debug_mode = debug_mode
         self._agent = None
+        self._sync_mode = sync_mode
         self._running = False
         self._timestamp_last_run = 0.0
         self._timeout = timeout
@@ -96,14 +97,14 @@ class ScenarioManager(object):
         """
         self._reset()
         self._agent = AgentWrapper(agent) if agent else None
+        if self._agent is not None:
+            self._sync_mode = True
         self.scenario_class = scenario
         self.scenario = scenario.scenario
         self.scenario_tree = self.scenario.scenario_tree
         self.ego_vehicles = scenario.ego_vehicles
         self.other_actors = scenario.other_actors
 
-        CarlaDataProvider.register_actors(self.ego_vehicles)
-        CarlaDataProvider.register_actors(self.other_actors)
         # To print the scenario tree uncomment the next line
         # py_trees.display.render_dot_tree(self.scenario_tree)
 
@@ -179,9 +180,7 @@ class ScenarioManager(object):
             if self._agent is not None:
                 self.ego_vehicles[0].apply_control(ego_action)
 
-
-
-        if self._agent and self._running and self._watchdog.get_status():
+        if self._sync_mode and self._running and self._watchdog.get_status():
             CarlaDataProvider.get_world().tick()
 
     def get_running_status(self):
@@ -209,6 +208,7 @@ class ScenarioManager(object):
         result = "SUCCESS"
 
         if self.scenario.test_criteria is None:
+            print("Nothing to analyze, this scenario has no criteria")
             return True
 
         for criterion in self.scenario.get_criteria():
