@@ -474,7 +474,7 @@ class CollisionTest(Criterion):
             # forward visual cone
 
             # Get the information of ego vehicle
-            ego_tra = CarlaDataProvider.get_transform(self._actor)
+            ego_tra = CarlaDataProvider.get_transform(self.actor)
             ego_loc = ego_tra.location
             ego_heading_vec = ego_tra.get_forward_vector()
             ego_heading_vec.z = 0

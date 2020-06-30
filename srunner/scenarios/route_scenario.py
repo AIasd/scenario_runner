@@ -293,8 +293,7 @@ class RouteScenario(BasicScenario):
 
         return sampled_scenarios
 
-    def _build_scenario_instances(self, world, ego_vehicle, scenario_definitions,
-                                  scenarios_per_tick=5, timeout=300, debug_mode=False):
+    def _build_scenario_instances(self, world, ego_vehicle, scenario_definitions, scenarios_per_tick=5, timeout=300, debug_mode=False):
         """
         Based on the parsed route and possible scenarios, build all the scenario classes.
         """
@@ -325,15 +324,12 @@ class RouteScenario(BasicScenario):
             scenario_configuration.other_actors = list_of_actor_conf_instances
             scenario_configuration.trigger_points = [egoactor_trigger_position]
             scenario_configuration.subtype = definition['scenario_type']
-            scenario_configuration.ego_vehicles = [ActorConfigurationData('vehicle.lincoln.mkz2017',
-                                                                          ego_vehicle.get_transform(),
-                                                                          'hero')]
+            scenario_configuration.ego_vehicles = [ActorConfigurationData('vehicle.lincoln.mkz2017', ego_vehicle.get_transform(), 'hero')]
             route_var_name = "ScenarioRouteNumber{}".format(scenario_number)
             scenario_configuration.route_var_name = route_var_name
 
             try:
-                scenario_instance = scenario_class(world, [ego_vehicle], scenario_configuration,
-                                                   criteria_enable=False, timeout=timeout)
+                scenario_instance = scenario_class(world, [ego_vehicle], scenario_configuration, criteria_enable=False, timeout=timeout)
                 # Do a tick every once in a while to avoid spawning everything at the same time
                 if scenario_number % scenarios_per_tick == 0:
                     if CarlaDataProvider.is_sync_mode():

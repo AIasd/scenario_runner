@@ -366,11 +366,9 @@ class VehicleTurningLeft(BasicScenario):
 
         bycicle_start_dist = 13 + dist_to_travel
 
+
         if self._ego_route is not None:
-            trigger_distance = InTriggerDistanceToLocationAlongRoute(self.ego_vehicles[0],
-                                                                     self._ego_route,
-                                                                     self._other_actor_transform.location,
-                                                                     bycicle_start_dist)
+            trigger_distance = InTriggerDistanceToLocationAlongRoute(self.ego_vehicles[0], self._ego_route, self._other_actor_transform.location, bycicle_start_dist)
         else:
             trigger_distance = InTriggerDistanceToVehicle(self.other_actors[0],
                                                           self.ego_vehicles[0],
@@ -394,8 +392,7 @@ class VehicleTurningLeft(BasicScenario):
 
         # building the tree
         root.add_child(scenario_sequence)
-        scenario_sequence.add_child(ActorTransformSetter(self.other_actors[0], self._other_actor_transform,
-                                                         name='TransformSetterTS4'))
+        scenario_sequence.add_child(ActorTransformSetter(self.other_actors[0], self._other_actor_transform, name='TransformSetterTS4'))
         scenario_sequence.add_child(HandBrakeVehicle(self.other_actors[0], True))
         scenario_sequence.add_child(trigger_distance)
         scenario_sequence.add_child(HandBrakeVehicle(self.other_actors[0], False))
@@ -442,13 +439,13 @@ class VehicleTurningRoute(BasicScenario):
     This is a single ego vehicle scenario
     """
 
-    def __init__(self, world, ego_vehicles, config, randomize=False, debug_mode=False, criteria_enable=True,
-                 timeout=60):
+    def __init__(self, world, ego_vehicles, config, randomize=False, debug_mode=False, criteria_enable=True, timeout=60, customized_data=None):
         """
         Setup all relevant parameters and create scenario
         """
 
-        self._other_actor_target_velocity = 10
+        self.customized_data = customized_data
+
         self._wmap = CarlaDataProvider.get_map()
         self._reference_waypoint = self._wmap.get_waypoint(config.trigger_points[0].location)
         self._trigger_location = config.trigger_points[0].location
@@ -492,8 +489,13 @@ class VehicleTurningRoute(BasicScenario):
             # Try to spawn the actor
             try:
                 self._other_actor_transform = get_opponent_transform(added_dist, waypoint, self._trigger_location)
+                # addition
+                self._other_actor_transform.location.x += self.customized_data['dx']
+                self._other_actor_transform.location.y += self.customized_data['dy']
+                self._other_actor_transform.rotation.yaw += self.customized_data['dyaw']
+
                 first_vehicle = CarlaDataProvider.request_new_actor(
-                    'vehicle.diamondback.century', self._other_actor_transform)
+                    self.customized_data['actor_type'], self._other_actor_transform)
                 first_vehicle.set_simulate_physics(enabled=False)
                 break
 
@@ -514,6 +516,7 @@ class VehicleTurningRoute(BasicScenario):
             self._other_actor_transform.rotation)
         first_vehicle.set_transform(actor_transform)
         first_vehicle.set_simulate_physics(enabled=False)
+
         self.other_actors.append(first_vehicle)
 
     def _create_behavior(self):
@@ -534,19 +537,19 @@ class VehicleTurningRoute(BasicScenario):
 
         bycicle_start_dist = 13 + dist_to_travel
 
+        # addition
+        bycicle_start_dist += self.customized_data['d_activation_dist']
+
         if self._ego_route is not None:
-            trigger_distance = InTriggerDistanceToLocationAlongRoute(self.ego_vehicles[0],
-                                                                     self._ego_route,
-                                                                     self._other_actor_transform.location,
-                                                                     bycicle_start_dist)
+            trigger_distance = InTriggerDistanceToLocationAlongRoute(self.ego_vehicles[0], self._ego_route, self._other_actor_transform.location, bycicle_start_dist)
         else:
             trigger_distance = InTriggerDistanceToVehicle(self.other_actors[0],
                                                           self.ego_vehicles[0],
                                                           bycicle_start_dist)
 
-        actor_velocity = KeepVelocity(self.other_actors[0], self._other_actor_target_velocity)
+        actor_velocity = KeepVelocity(self.other_actors[0], self.customized_data['_other_actor_target_velocity'])
         actor_traverse = DriveDistance(self.other_actors[0], 0.30 * dist_to_travel)
-        post_timer_velocity_actor = KeepVelocity(self.other_actors[0], self._other_actor_target_velocity)
+        post_timer_velocity_actor = KeepVelocity(self.other_actors[0], self.customized_data['_other_actor_target_velocity'])
         post_timer_traverse_actor = DriveDistance(self.other_actors[0], 0.70 * dist_to_travel)
         end_condition = TimeOut(5)
 
