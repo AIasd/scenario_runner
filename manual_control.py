@@ -47,7 +47,9 @@ Use ARROWS or WASD keys for control.
 """
 
 from __future__ import print_function
-
+# addition
+import sys
+sys.path.append("/home/zhongzzy9/Documents/self-driving-car/carla_0994_no_rss/PythonAPI")
 # ==============================================================================
 # -- imports -------------------------------------------------------------------
 # ==============================================================================

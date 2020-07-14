@@ -30,7 +30,8 @@ import time
 import pkg_resources
 
 import carla
-
+# addition
+sys.path.append("/home/zhongzzy9/Documents/self-driving-car/carla_0994_no_rss/PythonAPI/carla")
 from srunner.scenarioconfigs.openscenario_configuration import OpenScenarioConfiguration
 from srunner.scenariomanager.carla_data_provider import CarlaDataProvider
 from srunner.scenariomanager.scenario_manager import ScenarioManager

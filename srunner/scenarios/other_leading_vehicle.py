@@ -98,21 +98,18 @@ class OtherLeadingVehicle(BasicScenario):
         drives certain distance and stops the scenario.
         """
         # start condition
-        driving_in_same_direction = py_trees.composites.Parallel("All actors driving in same direction",
-                                                                 policy=py_trees.common.ParallelPolicy.SUCCESS_ON_ONE)
+        driving_in_same_direction = py_trees.composites.Parallel("All actors driving in same direction", policy=py_trees.common.ParallelPolicy.SUCCESS_ON_ONE)
         leading_actor_sequence_behavior = py_trees.composites.Sequence("Decelerating actor sequence behavior")
 
         # both actors moving in same direction
-        keep_velocity = py_trees.composites.Parallel("Trigger condition for deceleration",
-                                                     policy=py_trees.common.ParallelPolicy.SUCCESS_ON_ONE)
+        keep_velocity = py_trees.composites.Parallel("Trigger condition for deceleration", policy=py_trees.common.ParallelPolicy.SUCCESS_ON_ONE)
         keep_velocity.add_child(WaypointFollower(self.other_actors[0], self._first_vehicle_speed, avoid_collision=True))
         keep_velocity.add_child(InTriggerDistanceToVehicle(self.other_actors[0], self.ego_vehicles[0], 55))
 
         # Decelerating actor sequence behavior
         decelerate = self._first_vehicle_speed / 3.2
         leading_actor_sequence_behavior.add_child(keep_velocity)
-        leading_actor_sequence_behavior.add_child(WaypointFollower(self.other_actors[0], decelerate,
-                                                                   avoid_collision=True))
+        leading_actor_sequence_behavior.add_child(WaypointFollower(self.other_actors[0], decelerate, avoid_collision=True))
         # end condition
         ego_drive_distance = DriveDistance(self.ego_vehicles[0], self._ego_vehicle_drive_distance)
 
@@ -123,8 +120,7 @@ class OtherLeadingVehicle(BasicScenario):
         parallel_root.add_child(ego_drive_distance)
         parallel_root.add_child(driving_in_same_direction)
         driving_in_same_direction.add_child(leading_actor_sequence_behavior)
-        driving_in_same_direction.add_child(WaypointFollower(self.other_actors[1], self._second_vehicle_speed,
-                                                             avoid_collision=True))
+        driving_in_same_direction.add_child(WaypointFollower(self.other_actors[1], self._second_vehicle_speed, avoid_collision=True))
 
         sequence.add_child(ActorTransformSetter(self.other_actors[0], self._first_actor_transform))
         sequence.add_child(ActorTransformSetter(self.other_actors[1], self._second_actor_transform))
