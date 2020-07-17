@@ -932,7 +932,7 @@ class KeepVelocity(AtomicBehavior):
     Alternatively, a parallel termination behavior has to be used.
     """
 
-    def __init__(self, actor, target_velocity, duration=float("inf"), distance=float("inf"), name="KeepVelocity"):
+    def __init__(self, actor, target_velocity, duration=float("inf"), distance=float("inf"), name="KeepVelocity", target_direction=None):
         """
         Setup parameters including acceleration value (via throttle_value)
         and target velocity
@@ -942,6 +942,8 @@ class KeepVelocity(AtomicBehavior):
         self._target_velocity = target_velocity
 
         self._control, self._type = get_actor_control(actor)
+        if self._type != 'walker' and target_direction:
+            self._control.direction = target_direction
         self._map = self._actor.get_world().get_map()
         self._waypoint = self._map.get_waypoint(self._actor.get_location())
 
@@ -1477,9 +1479,7 @@ class WaypointFollower(AtomicBehavior):
                 if isinstance(self._plan[0], carla.Location):
                     plan = []
                     for location in self._plan:
-                        waypoint = CarlaDataProvider.get_map().get_waypoint(location,
-                                                                            project_to_road=True,
-                                                                            lane_type=carla.LaneType.Any)
+                        waypoint = CarlaDataProvider.get_map().get_waypoint(location, project_to_road=True, lane_type=carla.LaneType.Any)
                         plan.append((waypoint, RoadOption.LANEFOLLOW))
                     local_planner.set_global_plan(plan)
                 else:

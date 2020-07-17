@@ -24,6 +24,8 @@ from srunner.scenariomanager.timer import TimeOut
 from srunner.scenarios.basic_scenario import BasicScenario
 from srunner.tools.scenario_helper import generate_target_waypoint, generate_target_waypoint_in_route
 
+from customized_utils import visualize_route, perturb_route
+
 
 def get_generated_transform(added_dist, waypoint):
     """
@@ -62,7 +64,6 @@ class Intersection(BasicScenario):
         self.customized_data = customized_data
 
         self._wmap = CarlaDataProvider.get_map()
-        self._reference_waypoint = self._wmap.get_waypoint(config.trigger_points[0].location)
         self._trigger_location = config.trigger_points[0].location
         self._num_lane_changes = 0
 
@@ -158,7 +159,8 @@ class Intersection(BasicScenario):
             pedestrian_actor, pedestrian_generated_transform = self.pedestrian_list[i]
             pedestrian_info = self.customized_data['pedestrian_list'][i]
 
-            trigger_distance = InTriggerDistanceToVehicle(self.ego_vehicles[0], pedestrian_actor, pedestrian_info.trigger_distance)
+            trigger_distance = InTriggerDistanceToVehicle(self.ego_vehicles[0],
+            pedestrian_actor, pedestrian_info.trigger_distance)
 
             movement = py_trees.composites.Parallel(policy=py_trees.common.ParallelPolicy.SUCCESS_ON_ONE)
 
@@ -193,7 +195,10 @@ class Intersection(BasicScenario):
             vehicle_info = self.customized_data['vehicle_list'][i]
 
 
-            # trigger_distance = InTriggerDistanceToLocation(vehicle_actor, vehicle_info.trigger_waypoint.location, 2)
+
+
+
+
 
             keep_velocity = py_trees.composites.Parallel("Trigger condition for changing behavior", policy=py_trees.common.ParallelPolicy.SUCCESS_ON_ONE)
             keep_velocity.add_child(InTriggerDistanceToVehicle(self.ego_vehicles[0], vehicle_actor, vehicle_info.trigger_distance))
@@ -202,26 +207,39 @@ class Intersection(BasicScenario):
 
 
 
-            from leaderboard.utils.route_manipulation import interpolate_trajectory
-
-            start_location = generated_transform.location
-            end_location = vehicle_info.targeted_waypoint.location
-            _, route = interpolate_trajectory(self.world, [start_location, end_location])
-            plan = []
-            for transform, cmd in route:
-                plan.append((self._wmap.get_waypoint(transform.location), cmd))
+            if vehicle_info.waypoint_follower:
+                # interpolate current location and destination to find a path
+                from leaderboard.utils.route_manipulation import interpolate_trajectory, downsample_route
 
 
+                start_location = generated_transform.location
+                end_location = vehicle_info.targeted_waypoint.location
+                _, route = interpolate_trajectory(self.world, [start_location, end_location])
+                ds_ids = downsample_route(route, self.customized_data['sample_factor'])
+                route = [(route[x][0], route[x][1]) for x in ds_ids]
 
-            actor_waypoint_follower = WaypointFollower(actor=vehicle_actor, target_speed=vehicle_info.targeted_speed, plan=plan, avoid_collision=vehicle_info.avoid_collision)
+                print('route', len(route))
+                perturb_route(route, vehicle_info.waypoints_perturbation)
+                visualize_route(route)
+
+                plan = []
+                for transform, cmd in route:
+                    wp = self._wmap.get_waypoint(transform.location, project_to_road=False, lane_type=carla.LaneType.Any)
+                    print('lane_width :', wp.lane_width)
+                    plan.append((wp, cmd))
 
 
-            # vehicle_movement = py_trees.composites.Parallel(policy=py_trees.common.ParallelPolicy.SUCCESS_ON_ALL)
-            #
-            # vehicle_actor_velocity = KeepVelocity(vehicle_actor, vehicle_info.targeted_speed)
-            # vehicle_actor_traverse = DriveDistance(vehicle_actor, 100)
-            # vehicle_movement.add_child(vehicle_actor_velocity)
-            # vehicle_movement.add_child(vehicle_actor_traverse)
+                movement = WaypointFollower(actor=vehicle_actor, target_speed=vehicle_info.targeted_speed, plan=plan, avoid_collision=vehicle_info.avoid_collision)
+            else:
+                movement = py_trees.composites.Parallel(policy=py_trees.common.ParallelPolicy.SUCCESS_ON_ONE)
+                actor_velocity = KeepVelocity(vehicle_actor, vehicle_info.targeted_speed, target_direction=vehicle_info.target_direction)
+                actor_traverse = DriveDistance(vehicle_actor, vehicle_info.dist_to_travel)
+                movement.add_child(actor_velocity)
+                movement.add_child(actor_traverse)
+
+
+
+
 
 
 
@@ -238,8 +256,7 @@ class Intersection(BasicScenario):
             vehicle_behaviors = py_trees.composites.Sequence()
 
             vehicle_behaviors.add_child(keep_velocity)
-            # vehicle_behaviors.add_child(vehicle_movement)
-            vehicle_behaviors.add_child(actor_waypoint_follower)
+            vehicle_behaviors.add_child(movement)
             vehicle_behaviors.add_child(after_trigger_behavior)
 
             waypoint_events.add_child(vehicle_behaviors)
