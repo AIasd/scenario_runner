@@ -505,8 +505,7 @@ class CarlaDataProvider(object):  # pylint: disable=too-many-public-methods
         return actors
 
     @staticmethod
-    def request_new_actor(model, spawn_point, rolename='scenario', autopilot=False,
-                          random_location=False, color=None, actor_category="car"):
+    def request_new_actor(model, spawn_point, rolename='scenario', autopilot=False, random_location=False, color=None, actor_category="car"):
         """
         This method tries to create a new actor, returning it if successful (None otherwise).
         """

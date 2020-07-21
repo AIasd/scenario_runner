@@ -24,7 +24,7 @@ from srunner.scenariomanager.timer import TimeOut
 from srunner.scenarios.basic_scenario import BasicScenario
 from srunner.tools.scenario_helper import generate_target_waypoint, generate_target_waypoint_in_route
 
-from customized_utils import visualize_route, perturb_route
+from customized_utils import visualize_route, perturb_route, add_transform
 
 
 def get_generated_transform(added_dist, waypoint):
@@ -88,7 +88,7 @@ class Intersection(BasicScenario):
                                                   criteria_enable=criteria_enable)
 
 
-    def _request_actor(self, actor_category, actor_model, waypoint_transform, simulation_enabled=False):
+    def _request_actor(self, actor_category, actor_model, waypoint_transform, simulation_enabled=False, color=None):
         # Number of attempts made so far
         _spawn_attempted = 0
 
@@ -100,7 +100,7 @@ class Intersection(BasicScenario):
                 generated_transform = get_generated_transform(added_dist, waypoint)
 
                 actor_object = CarlaDataProvider.request_new_actor(
-                    model=actor_model, spawn_point=generated_transform, actor_category=actor_category)
+                    model=actor_model, spawn_point=generated_transform, color=color, actor_category=actor_category)
 
                 break
 
@@ -122,15 +122,37 @@ class Intersection(BasicScenario):
         """
 
         for static_i in self.customized_data['static_list']:
-            static_actor, static_generated_transform = self._request_actor('static', static_i.model, static_i.spawn_transform, True)
-            print('static', static_actor, static_generated_transform)
+            if 'add_center' in self.customized_data and self.customized_data['add_center']:
+                static_spawn_transform_i = add_transform(self.customized_data['center_transform'], static_i.spawn_transform)
+            else:
+                static_spawn_transform_i = static_i.spawn_transform
+
+            static_actor, static_generated_transform = self._request_actor('static', static_i.model, static_spawn_transform_i, True)
+
             self.static_list.append((static_actor, static_generated_transform))
+            print('static', static_actor, static_generated_transform)
+
+
         for pedestrian_i in self.customized_data['pedestrian_list']:
-            pedestrian_actor, pedestrian_generated_transform = self._request_actor('pedestrian', pedestrian_i.model, pedestrian_i.spawn_transform)
-            print('pedestrian', pedestrian_actor, pedestrian_generated_transform)
+            if 'add_center' in self.customized_data and self.customized_data['add_center']:
+                pedestrian_spawn_transform_i = add_transform(self.customized_data['center_transform'], pedestrian_i.spawn_transform)
+            else:
+                pedestrian_spawn_transform_i = pedestrian_i.spawn_transform
+
+            pedestrian_actor, pedestrian_generated_transform = self._request_actor('pedestrian', pedestrian_i.model, pedestrian_spawn_transform_i)
+
             self.pedestrian_list.append((pedestrian_actor, pedestrian_generated_transform))
+            print('pedestrian', pedestrian_actor, pedestrian_generated_transform)
+
+
         for vehicle_i in self.customized_data['vehicle_list']:
-            vehicle_actor, vehicle_generated_transform = self._request_actor('vehicle', vehicle_i.model, vehicle_i.spawn_transform, True)
+            if 'add_center' in self.customized_data and self.customized_data['add_center']:
+                vehicle_spawn_transform_i = add_transform(self.customized_data['center_transform'], vehicle_i.spawn_transform)
+            else:
+                vehicle_spawn_transform_i = vehicle_i.spawn_transform
+
+            vehicle_actor, vehicle_generated_transform = self._request_actor('vehicle', vehicle_i.model, vehicle_spawn_transform_i, True, vehicle_i.color)
+
             if hasattr(vehicle_i, 'color'):
                 vehicle_actor.color = vehicle_i.color
             self.vehicle_list.append((vehicle_actor, vehicle_generated_transform))
@@ -225,7 +247,9 @@ class Intersection(BasicScenario):
                 plan = []
                 for transform, cmd in route:
                     wp = self._wmap.get_waypoint(transform.location, project_to_road=False, lane_type=carla.LaneType.Any)
-                    print('lane_width :', wp.lane_width)
+                    if not wp:
+                        wp = self._wmap.get_waypoint(transform.location, project_to_road=True, lane_type=carla.LaneType.Any)
+                        print(transform.location, 'is replaced by', wp.transform.location)
                     plan.append((wp, cmd))
 
 

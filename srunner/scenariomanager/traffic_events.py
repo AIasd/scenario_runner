@@ -31,6 +31,7 @@ class TrafficEventType(Enum):
     OUTSIDE_ROUTE_LANES_INFRACTION = 12
     VEHICLE_BLOCKED = 13
     COLLISION_INVISIBLE = 14
+    OFF_ROAD_INFRACTION = 15
 
 
 class TrafficEvent(object):

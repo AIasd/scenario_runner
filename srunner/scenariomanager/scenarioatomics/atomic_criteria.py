@@ -533,20 +533,27 @@ class CollisionTest(Criterion):
             actor_type = TrafficEventType.COLLISION_INVISIBLE
 
 
+        ego_linear_speed = CarlaDataProvider.get_velocity(self.actor)
+        other_actor_linear_speed = CarlaDataProvider.get_velocity(event.other_actor)
+
         collision_event = TrafficEvent(event_type=actor_type)
         collision_event.set_dict({
             'type': event.other_actor.type_id,
             'id': event.other_actor.id,
             'x': actor_location.x,
             'y': actor_location.y,
-            'z': actor_location.z})
+            'z': actor_location.z,
+            'ego_linear_speed': ego_linear_speed,
+            'other_actor_linear_speed': other_actor_linear_speed})
         collision_event.set_message(
-            "Agent collided against object with type={} and id={} at (x={}, y={}, z={})".format(
+            "Agent collided against object with type={} and id={} at (x={}, y={}, z={}, ego_linear_speed={.2f}, other_actor_linear_speed={.2f})".format(
                 event.other_actor.type_id,
                 event.other_actor.id,
                 round(actor_location.x, ROUND_PREC),
                 round(actor_location.y, ROUND_PREC),
-                round(actor_location.z, ROUND_PREC)))
+                round(actor_location.z, ROUND_PREC),
+                ego_linear_speed,
+                other_actor_linear_speed))
 
         self.test_status = "FAILURE"
         self.actual_value += 1
@@ -773,6 +780,8 @@ class OffRoadTest(Criterion):
         self._prev_time = None
         self._time_offroad = 0
 
+        self.actual_value = 0
+
     def update(self):
         """
         First, transforms the actor's current position to its corresponding waypoint. This is
@@ -799,8 +808,12 @@ class OffRoadTest(Criterion):
         )
         if drive_waypoint or park_waypoint:
             self._offroad = False
+            self.valid_location = current_location
         else:
+            self.offroad_location = current_location
             self._offroad = True
+            self.actual_value += 1
+            self.offroad_dist = self.offroad_location.distance(self.valid_location)
 
         # Counts the time offroad
         if self._offroad:
@@ -816,12 +829,53 @@ class OffRoadTest(Criterion):
         if self._time_offroad > self._duration:
             self.test_status = "FAILURE"
 
-        if self._terminate_on_failure and self.test_status == "FAILURE":
-            new_status = py_trees.common.Status.FAILURE
 
         self.logger.debug("%s.update()[%s->%s]" % (self.__class__.__name__, self.status, new_status))
 
+        if self._terminate_on_failure and self.test_status == "FAILURE":
+            new_status = py_trees.common.Status.FAILURE
+
         return new_status
+
+
+    def terminate(self, new_status):
+        """
+        If there is currently an event running, it is registered
+        """
+
+        offroad_event = TrafficEvent(event_type=TrafficEventType.OFF_ROAD_INFRACTION)
+
+        self._set_event_message(offroad_event, self.offroad_location)
+        self._set_event_dict(offroad_event, self.offroad_location)
+        self.list_traffic_events.append(offroad_event)
+
+        # addition: new event
+        blackv = py_trees.blackboard.Blackboard()
+        _ = blackv.set("OffRoad", self.actual_value)
+
+        super(OffRoadTest, self).terminate(new_status)
+
+    def _set_event_message(self, event, location):
+        """
+        Sets the message of the event
+        """
+        event.set_message(
+            "Agent goes off road at (x={}, y={}, z={}, offroad distance={}). ".format(
+                round(location.x, ROUND_PREC),
+                round(location.y, ROUND_PREC),
+                round(location.z, ROUND_PREC),
+                self.offroad_dist))
+
+    def _set_event_dict(self, event, location):
+        """
+        Sets the dictionary of the event
+        """
+        event.set_dict({
+            'x': location.x,
+            'y': location.y,
+            'z': location.z,
+            'offroad_dist': self.offroad_dist})
+
 
 
 class EndofRoadTest(Criterion):
@@ -930,6 +984,9 @@ class OnSidewalkTest(Criterion):
         self._time_outside_lanes = 0
 
         self.actual_value = 0
+
+        # addition
+        self.max_time_outside_lanes = 0
 
     def update(self):
         """
@@ -1049,6 +1106,10 @@ class OnSidewalkTest(Criterion):
         if self._time_outside_lanes > self._duration:
             self.test_status = "FAILURE"
 
+        # addition
+        if self._time_outside_lanes > self.max_time_outside_lanes:
+            self.max_time_outside_lanes = self._time_outside_lanes - self._duration
+
         # Update the distances
         distance_vector = CarlaDataProvider.get_location(self._actor) - self._actor_location
         distance = math.sqrt(math.pow(distance_vector.x, 2) + math.pow(distance_vector.y, 2))
@@ -1147,6 +1208,7 @@ class OnSidewalkTest(Criterion):
             self._outside_lane_active = False
             self._wrong_outside_lane_distance = 0
             self.list_traffic_events.append(outsidelane_event)
+
         # addition: new event
         blackv = py_trees.blackboard.Blackboard()
         _ = blackv.set("OnSideWalk", self.actual_value)
@@ -1163,12 +1225,13 @@ class OnSidewalkTest(Criterion):
             message_start = 'Agent went outside the lane'
 
         event.set_message(
-            '{} for about {} meters, starting at (x={}, y={}, z={})'.format(
+            '{} for about {} meters, starting at (x={}, y={}, z={}, max_time_outside_lanes={})'.format(
                 message_start,
                 round(distance, ROUND_PREC),
                 round(location.x, ROUND_PREC),
                 round(location.y, ROUND_PREC),
-                round(location.z, ROUND_PREC)))
+                round(location.z, ROUND_PREC),
+                self.max_time_outside_lanes))
 
     def _set_event_dict(self, event, location, distance):
         """
@@ -1178,7 +1241,8 @@ class OnSidewalkTest(Criterion):
             'x': location.x,
             'y': location.y,
             'z': location.z,
-            'distance': distance})
+            'distance': distance,
+            'max_time_outside_lanes': self.max_time_outside_lanes})
 
 
 class OutsideRouteLanesTest(Criterion):
@@ -1220,6 +1284,13 @@ class OutsideRouteLanesTest(Criterion):
         self._last_lane_id = None
         self._total_distance = 0
         self._wrong_distance = 0
+
+        # addition
+        self.vehicle_lane_angle = 0
+        self.waypoint_angle = 0
+        self.max_extra_out_distance = 0
+        self.max_extra_vehicle_lane_angle = 0
+        self.max_extra_waypoint_angle = 0
 
     def update(self):
         """
@@ -1299,6 +1370,11 @@ class OutsideRouteLanesTest(Criterion):
 
         self._outside_lane_active = bool(distance > (lane_width / 2 + self.ALLOWED_OUT_DISTANCE))
 
+        # addition
+        cur_out_distance =  distance - (lane_width / 2 + self.ALLOWED_OUT_DISTANCE)
+        if cur_out_distance > self.max_extra_out_distance:
+            self.max_extra_out_distance = cur_out_distance
+
     def _is_at_wrong_lane(self, location):
         """
         Detects if the ego_vehicle has invaded a wrong lane
@@ -1319,6 +1395,8 @@ class OutsideRouteLanesTest(Criterion):
                 yaw_actor = self._actor.get_transform().rotation.yaw % 360
 
                 vehicle_lane_angle = (yaw_waypt - yaw_actor) % 360
+                # addition
+                self.vehicle_lane_angle = vehicle_lane_angle
 
                 if vehicle_lane_angle < self.MAX_ALLOWED_VEHICLE_ANGLE \
                         or vehicle_lane_angle > (360 - self.MAX_ALLOWED_VEHICLE_ANGLE):
@@ -1332,6 +1410,8 @@ class OutsideRouteLanesTest(Criterion):
                 yaw_cur_wp = current_waypoint.transform.rotation.yaw % 360
 
                 waypoint_angle = (yaw_pre_wp - yaw_cur_wp) % 360
+                # addition
+                self.waypoint_angle = waypoint_angle
 
                 if waypoint_angle >= self.MAX_ALLOWED_WAYPOINT_ANGLE \
                         and waypoint_angle <= (360 - self.MAX_ALLOWED_WAYPOINT_ANGLE):
@@ -1342,6 +1422,14 @@ class OutsideRouteLanesTest(Criterion):
 
                     # Changing to a lane with the same direction
                     self._wrong_lane_active = False
+
+        # addition
+        cur_vehicle_lane_angle = np.max([self.vehicle_lane_angle - self.MAX_ALLOWED_VEHICLE_ANGLE, (360 - self.MAX_ALLOWED_VEHICLE_ANGLE) - self.vehicle_lane_angle])
+        if cur_vehicle_lane_angle > self.max_extra_vehicle_lane_angle:
+            self.max_extra_vehicle_lane_angle = cur_vehicle_lane_angle
+        cur_waypoint_angle = np.max([self.waypoint_angle - self.MAX_ALLOWED_WAYPOINT_ANGLE, (360 - self.MAX_ALLOWED_WAYPOINT_ANGLE) - self.waypoint_angle])
+        if cur_waypoint_angle > self.max_extra_waypoint_angle:
+            self.max_extra_waypoint_angle = cur_waypoint_angle
 
         # Remember the last state
         self._last_lane_id = current_lane_id
@@ -1364,13 +1452,19 @@ class OutsideRouteLanesTest(Criterion):
             outside_lane = TrafficEvent(event_type=TrafficEventType.OUTSIDE_ROUTE_LANES_INFRACTION)
             outside_lane.set_message(
                 "Agent went outside its route lanes for about {} meters "
-                "({}% of the completed route)".format(
+                "({}% of the completed route with max_extra_out_distance={}, max_extra_vehicle_lane_angle={}, max_extra_waypoint_angle={})".format(
                     round(self._wrong_distance, 3),
-                    round(percentage, 2)))
+                    round(percentage, 2),
+                    self.max_extra_out_distance,
+                    self.max_extra_vehicle_lane_angle,
+                    self.max_extra_waypoint_angle))
 
             outside_lane.set_dict({
                 'distance': self._wrong_distance,
-                'percentage': percentage
+                'percentage': percentage,
+                'max_extra_out_distance': self.max_extra_out_distance,
+                'max_extra_vehicle_lane_angle': self.max_extra_vehicle_lane_angle,
+                'max_extra_waypoint_angle': self.max_extra_waypoint_angle
             })
 
             self._wrong_distance = 0
@@ -1396,11 +1490,11 @@ class WrongLaneTest(Criterion):
     MAX_ALLOWED_ANGLE = 120.0
     MAX_ALLOWED_WAYPOINT_ANGLE = 150.0
 
-    def __init__(self, actor, optional=False, name="WrongLaneTest"):
+    def __init__(self, actor, optional=False, terminate_on_failure=False, name="WrongLaneTest"):
         """
         Construction with sensor setup
         """
-        super(WrongLaneTest, self).__init__(name, actor, 0, None, optional)
+        super(WrongLaneTest, self).__init__(name, actor, 0, None, optional, terminate_on_failure)
         self.logger.debug("%s.__init__()" % (self.__class__.__name__))
 
         self._actor = actor
@@ -1415,6 +1509,13 @@ class WrongLaneTest(Criterion):
         self._wrong_lane_start_location = None
 
         self.actual_value = 0
+
+        # addition
+        self.waypoint_angle = 0
+        self.max_extra_vehicle_lane_angle = 0
+        self.max_extra_waypoint_angle = 0
+
+
 
     def update(self):
         """
@@ -1448,6 +1549,8 @@ class WrongLaneTest(Criterion):
             waypoint_angle = math.degrees(
                 math.acos(np.clip(np.dot(p_lane_vector, c_lane_vector) /
                                   (np.linalg.norm(p_lane_vector) * np.linalg.norm(c_lane_vector)), -1.0, 1.0)))
+            # addition
+            self.waypoint_angle = waypoint_angle
 
             if waypoint_angle > self.MAX_ALLOWED_WAYPOINT_ANGLE and self._in_lane:
 
@@ -1510,6 +1613,17 @@ class WrongLaneTest(Criterion):
 
         self.logger.debug("%s.update()[%s->%s]" % (self.__class__.__name__, self.status, new_status))
 
+        # addition
+        cur_vehicle_lane_angle = self.waypoint_angle - self.MAX_ALLOWED_WAYPOINT_ANGLE
+        if cur_vehicle_lane_angle > self.max_extra_vehicle_lane_angle and self._in_lane:
+            self.max_extra_vehicle_lane_angle = cur_vehicle_lane_angle
+        cur_waypoint_angle = self.waypoint_angle - self.MAX_ALLOWED_WAYPOINT_ANGLE
+        if cur_waypoint_angle > self.max_extra_waypoint_angle:
+            self.max_extra_waypoint_angle = cur_waypoint_angle
+
+        if self.test_status == "FAILURE" and terminate_on_failure:
+            new_status = py_trees.common.Status.FAILURE
+
         return new_status
 
     def terminate(self, new_status):
@@ -1545,14 +1659,15 @@ class WrongLaneTest(Criterion):
         """
 
         event.set_message(
-            "Agent invaded a lane in opposite direction for {} meters, starting at (x={}, y={}, z={}). "
-            "road_id={}, lane_id={}".format(
+            "Agent invaded a lane in opposite direction for {} meters, at x={}, y={}, z={}, road_id={}, lane_id={}, max_extra_vehicle_lane_angle={}, max_waypoint_angle={}".format(
                 round(distance, ROUND_PREC),
                 round(location.x, ROUND_PREC),
                 round(location.y, ROUND_PREC),
                 round(location.z, ROUND_PREC),
                 road_id,
-                lane_id))
+                lane_id,
+                self.max_extra_vehicle_lane_angle,
+                self.max_extra_waypoint_angle))
 
     def _set_event_dict(self, event, location, distance, road_id, lane_id):
         """
@@ -1561,10 +1676,12 @@ class WrongLaneTest(Criterion):
         event.set_dict({
             'x': location.x,
             'y': location.y,
-            'z': location.y,
+            'z': location.z,
             'distance': distance,
             'road_id': road_id,
-            'lane_id': lane_id})
+            'lane_id': lane_id,
+            'max_extra_vehicle_lane_angle': self.max_extra_vehicle_lane_angle,
+            'max_extra_waypoint_angle': self.max_extra_waypoint_angle})
 
 
 class InRadiusRegionTest(Criterion):
