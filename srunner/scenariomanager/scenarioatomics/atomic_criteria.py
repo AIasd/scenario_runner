@@ -843,11 +843,12 @@ class OffRoadTest(Criterion):
         If there is currently an event running, it is registered
         """
 
-        offroad_event = TrafficEvent(event_type=TrafficEventType.OFF_ROAD_INFRACTION)
+        if self.test_status == "FAILURE":
+            offroad_event = TrafficEvent(event_type=TrafficEventType.OFF_ROAD_INFRACTION)
 
-        self._set_event_message(offroad_event, self.offroad_location)
-        self._set_event_dict(offroad_event, self.offroad_location)
-        self.list_traffic_events.append(offroad_event)
+            self._set_event_message(offroad_event, self.offroad_location)
+            self._set_event_dict(offroad_event, self.offroad_location)
+            self.list_traffic_events.append(offroad_event)
 
         # addition: new event
         blackv = py_trees.blackboard.Blackboard()
