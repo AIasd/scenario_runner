@@ -26,6 +26,7 @@ from srunner.tools.scenario_helper import generate_target_waypoint, generate_tar
 
 from customized_utils import visualize_route, perturb_route, add_transform
 
+from leaderboard.utils.route_manipulation import interpolate_trajectory, downsample_route
 
 def get_generated_transform(added_dist, waypoint):
     """
@@ -71,7 +72,10 @@ class Intersection(BasicScenario):
         # Timeout of scenario in seconds
         self.timeout = timeout
         # Total Number of attempts to relocate a vehicle before spawning
-        self._number_of_attempts = 6
+        if 'number_of_attempts_to_request_actor' in customized_data:
+            self._number_of_attempts = customized_data['number_of_attempts_to_request_actor']
+        else:
+            self._number_of_attempts = 10
 
         self._ego_route = CarlaDataProvider.get_ego_vehicle_route()
 
@@ -107,11 +111,11 @@ class Intersection(BasicScenario):
             # Move the spawning point a bit and try again
             except RuntimeError as r:
                 # In the case there is an object just move a little bit and retry
-                print(" Base transform is blocking object", actor_model, 'at', generated_transform)
+                print(" Base transform is blocking object", actor_model, 'at', '(', generated_transform.location.x, generated_transform.location.y, ')')
                 added_dist += 0.5
                 _spawn_attempted += 1
                 if _spawn_attempted >= self._number_of_attempts:
-                    raise r
+                    print('fail to generate object', actor_model, 'at', '(', waypoint_transform.location.x, waypoint_transform.location.y, ')')
 
         actor_object.set_simulate_physics(enabled=simulation_enabled)
         return actor_object, generated_transform
@@ -130,7 +134,7 @@ class Intersection(BasicScenario):
             static_actor, static_generated_transform = self._request_actor('static', static_i.model, static_spawn_transform_i, True)
 
             self.static_list.append((static_actor, static_generated_transform))
-            print('static', static_actor, static_generated_transform)
+            print('static', static_actor, '(', static_generated_transform.location.x, static_generated_transform.location.y, ')')
 
 
         for pedestrian_i in self.customized_data['pedestrian_list']:
@@ -142,7 +146,7 @@ class Intersection(BasicScenario):
             pedestrian_actor, pedestrian_generated_transform = self._request_actor('pedestrian', pedestrian_i.model, pedestrian_spawn_transform_i)
 
             self.pedestrian_list.append((pedestrian_actor, pedestrian_generated_transform))
-            print('pedestrian', pedestrian_actor, pedestrian_generated_transform)
+            print('pedestrian', pedestrian_actor, '(', pedestrian_generated_transform.location.x, pedestrian_generated_transform.location.y, ')')
 
 
         for vehicle_i in self.customized_data['vehicle_list']:
@@ -156,7 +160,7 @@ class Intersection(BasicScenario):
             if hasattr(vehicle_i, 'color'):
                 vehicle_actor.color = vehicle_i.color
             self.vehicle_list.append((vehicle_actor, vehicle_generated_transform))
-            print('vehicle', vehicle_actor, vehicle_generated_transform)
+            print('vehicle', vehicle_actor, '(', vehicle_generated_transform.location.x, vehicle_generated_transform.location.y, ')')
 
 
     def _create_behavior(self):
@@ -218,10 +222,6 @@ class Intersection(BasicScenario):
 
 
 
-
-
-
-
             keep_velocity = py_trees.composites.Parallel("Trigger condition for changing behavior", policy=py_trees.common.ParallelPolicy.SUCCESS_ON_ONE)
             keep_velocity.add_child(InTriggerDistanceToVehicle(self.ego_vehicles[0], vehicle_actor, vehicle_info.trigger_distance))
             keep_velocity.add_child(WaypointFollower(vehicle_actor, vehicle_info.initial_speed, avoid_collision=vehicle_info.avoid_collision))
@@ -231,8 +231,6 @@ class Intersection(BasicScenario):
 
             if vehicle_info.waypoint_follower:
                 # interpolate current location and destination to find a path
-                from leaderboard.utils.route_manipulation import interpolate_trajectory, downsample_route
-
 
                 start_location = generated_transform.location
                 end_location = vehicle_info.targeted_waypoint.location
@@ -240,16 +238,16 @@ class Intersection(BasicScenario):
                 ds_ids = downsample_route(route, self.customized_data['sample_factor'])
                 route = [(route[x][0], route[x][1]) for x in ds_ids]
 
-                print('route', len(route))
+                # print('route', len(route))
                 perturb_route(route, vehicle_info.waypoints_perturbation)
-                visualize_route(route)
+                # visualize_route(route)
 
                 plan = []
                 for transform, cmd in route:
                     wp = self._wmap.get_waypoint(transform.location, project_to_road=False, lane_type=carla.LaneType.Any)
                     if not wp:
                         wp = self._wmap.get_waypoint(transform.location, project_to_road=True, lane_type=carla.LaneType.Any)
-                        print(transform.location, 'is replaced by', wp.transform.location)
+                        print('(', transform.location.x, transform.location.y, ')', 'is replaced by', '(', wp.transform.location.x, wp.transform.location.y, ')')
                     plan.append((wp, cmd))
 
 

@@ -546,14 +546,14 @@ class CollisionTest(Criterion):
             'ego_linear_speed': ego_linear_speed,
             'other_actor_linear_speed': other_actor_linear_speed})
         collision_event.set_message(
-            "Agent collided against object with type={} and id={} at (x={}, y={}, z={}, ego_linear_speed={.2f}, other_actor_linear_speed={.2f})".format(
+            "Agent collided against object with type={} and id={} at (x={}, y={}, z={}, ego_linear_speed={}, other_actor_linear_speed={})".format(
                 event.other_actor.type_id,
                 event.other_actor.id,
                 round(actor_location.x, ROUND_PREC),
                 round(actor_location.y, ROUND_PREC),
                 round(actor_location.z, ROUND_PREC),
-                ego_linear_speed,
-                other_actor_linear_speed))
+                round(ego_linear_speed, ROUND_PREC),
+                round(other_actor_linear_speed, ROUND_PREC)))
 
         self.test_status = "FAILURE"
         self.actual_value += 1
@@ -1622,7 +1622,7 @@ class WrongLaneTest(Criterion):
         if cur_waypoint_angle > self.max_extra_waypoint_angle:
             self.max_extra_waypoint_angle = cur_waypoint_angle
 
-        if self.test_status == "FAILURE" and terminate_on_failure:
+        if self.test_status == "FAILURE" and self.terminate_on_failure:
             new_status = py_trees.common.Status.FAILURE
 
         return new_status
