@@ -96,7 +96,7 @@ class Intersection(BasicScenario):
         # Number of attempts made so far
         _spawn_attempted = 0
 
-        waypoint = self._wmap.get_waypoint(waypoint_transform.location)
+        waypoint = self._wmap.get_waypoint(waypoint_transform.location, project_to_road=False, lane_type=carla.LaneType.Any)
         added_dist = 0
         while True:
             # Try to spawn the actor
@@ -111,11 +111,12 @@ class Intersection(BasicScenario):
             # Move the spawning point a bit and try again
             except RuntimeError as r:
                 # In the case there is an object just move a little bit and retry
-                print(" Base transform is blocking object", actor_model, 'at', '(', generated_transform.location.x, generated_transform.location.y, ')')
+                print(" Base transform is blocking object", actor_model, 'at', '(', generated_transform.location.x, generated_transform.location.y, ')', ', attempted:', _spawn_attempted)
                 added_dist += 0.5
                 _spawn_attempted += 1
                 if _spawn_attempted >= self._number_of_attempts:
-                    print('fail to generate object', actor_model, 'at', '(', waypoint_transform.location.x, waypoint_transform.location.y, ')')
+                    print('fail to generate object', actor_model, 'at', '(', waypoint_transform.location.x, waypoint_transform.location.y, ')', 'project to road!!!')
+                    waypoint = self._wmap.get_waypoint(waypoint_transform.location, project_to_road=True, lane_type=carla.LaneType.Any)
 
         actor_object.set_simulate_physics(enabled=simulation_enabled)
         return actor_object, generated_transform
@@ -132,9 +133,9 @@ class Intersection(BasicScenario):
 
         for i, static_i in enumerate(self.customized_data['static_list']):
             if 'add_center' in self.customized_data and self.customized_data['add_center']:
-                if 'static_center_transforms' in self.customized_data and i in self.customized_data['static_center_transforms']:
-                     x, y = self.customized_data['static_center_transforms'][i]
-                     center_transform = create_transform(x, y, 0, 0, 0, 0)
+                key = 'static_center_transform'+'_'+str(i)
+                if key in self.customized_data:
+                    center_transform = self.customized_data[key]
                 else:
                     center_transform = self.customized_data['center_transform']
 
@@ -150,9 +151,9 @@ class Intersection(BasicScenario):
 
         for i, pedestrian_i in enumerate(self.customized_data['pedestrian_list']):
             if 'add_center' in self.customized_data and self.customized_data['add_center']:
-                if 'pedestrian_center_transforms' in self.customized_data and i in self.customized_data['pedestrian_center_transforms']:
-                     x, y = self.customized_data['pedestrian_center_transforms'][i]
-                     center_transform = create_transform(x, y, 0, 0, 0, 0)
+                key = 'pedestrian_center_transform'+'_'+str(i)
+                if key in self.customized_data:
+                    center_transform = self.customized_data[key]
                 else:
                     center_transform = self.customized_data['center_transform']
 
@@ -168,9 +169,9 @@ class Intersection(BasicScenario):
 
         for i, vehicle_i in enumerate(self.customized_data['vehicle_list']):
             if 'add_center' in self.customized_data and self.customized_data['add_center']:
-                if 'vehicle_center_transforms' in self.customized_data and i in self.customized_data['vehicle_center_transforms']:
-                     x, y = self.customized_data['vehicle_center_transforms'][i]
-                     center_transform = create_transform(x, y, 0, 0, 0, 0)
+                key = 'vehicle_center_transform'+'_'+str(i)
+                if key in self.customized_data:
+                     center_transform = self.customized_data[key]
                 else:
                     center_transform = self.customized_data['center_transform']
 
