@@ -537,21 +537,33 @@ class CollisionTest(Criterion):
         other_actor_linear_speed = CarlaDataProvider.get_velocity(event.other_actor)
 
         collision_event = TrafficEvent(event_type=actor_type)
+
+        actor_location = CarlaDataProvider.get_location(self.actor)
+
+        if actor_location:
+            a_x = actor_location.x
+            a_y = actor_location.y
+            a_z = actor_location.z
+        else:
+            a_x = None
+            a_y = None
+            a_z = None
+
         collision_event.set_dict({
             'type': event.other_actor.type_id,
             'id': event.other_actor.id,
-            'x': actor_location.x,
-            'y': actor_location.y,
-            'z': actor_location.z,
+            'x': a_x,
+            'y': a_y,
+            'z': a_z,
             'ego_linear_speed': ego_linear_speed,
             'other_actor_linear_speed': other_actor_linear_speed})
         collision_event.set_message(
             "Agent collided against object with type={} and id={} at (x={}, y={}, z={}, ego_linear_speed={}, other_actor_linear_speed={})".format(
                 event.other_actor.type_id,
                 event.other_actor.id,
-                round(actor_location.x, ROUND_PREC),
-                round(actor_location.y, ROUND_PREC),
-                round(actor_location.z, ROUND_PREC),
+                round(a_x, ROUND_PREC),
+                round(a_y, ROUND_PREC),
+                round(a_z, ROUND_PREC),
                 round(ego_linear_speed, ROUND_PREC),
                 round(other_actor_linear_speed, ROUND_PREC)))
 

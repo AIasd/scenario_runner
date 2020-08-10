@@ -24,7 +24,7 @@ from srunner.scenariomanager.timer import TimeOut
 from srunner.scenarios.basic_scenario import BasicScenario
 from srunner.tools.scenario_helper import generate_target_waypoint, generate_target_waypoint_in_route
 
-from customized_utils import visualize_route, perturb_route, add_transform
+from customized_utils import visualize_route, perturb_route, add_transform, create_transform
 
 from leaderboard.utils.route_manipulation import interpolate_trajectory, downsample_route
 
@@ -123,11 +123,22 @@ class Intersection(BasicScenario):
     def _initialize_actors(self, config):
         """
         Custom initialization
+
+        static_center_transforms, static_center_transforms, vehicle_center_transforms:
+        {i:(x_i, y_i)}
         """
 
-        for static_i in self.customized_data['static_list']:
+
+
+        for i, static_i in enumerate(self.customized_data['static_list']):
             if 'add_center' in self.customized_data and self.customized_data['add_center']:
-                static_spawn_transform_i = add_transform(self.customized_data['center_transform'], static_i.spawn_transform)
+                if 'static_center_transforms' in self.customized_data and i in self.customized_data['static_center_transforms']:
+                     x, y = self.customized_data['static_center_transforms'][i]
+                     center_transform = create_transform(x, y, 0, 0, 0, 0)
+                else:
+                    center_transform = self.customized_data['center_transform']
+
+                static_spawn_transform_i = add_transform(center_transform, static_i.spawn_transform)
             else:
                 static_spawn_transform_i = static_i.spawn_transform
 
@@ -137,9 +148,15 @@ class Intersection(BasicScenario):
             print('static', static_actor, '(', static_generated_transform.location.x, static_generated_transform.location.y, ')')
 
 
-        for pedestrian_i in self.customized_data['pedestrian_list']:
+        for i, pedestrian_i in enumerate(self.customized_data['pedestrian_list']):
             if 'add_center' in self.customized_data and self.customized_data['add_center']:
-                pedestrian_spawn_transform_i = add_transform(self.customized_data['center_transform'], pedestrian_i.spawn_transform)
+                if 'pedestrian_center_transforms' in self.customized_data and i in self.customized_data['pedestrian_center_transforms']:
+                     x, y = self.customized_data['pedestrian_center_transforms'][i]
+                     center_transform = create_transform(x, y, 0, 0, 0, 0)
+                else:
+                    center_transform = self.customized_data['center_transform']
+
+                pedestrian_spawn_transform_i = add_transform(center_transform, pedestrian_i.spawn_transform)
             else:
                 pedestrian_spawn_transform_i = pedestrian_i.spawn_transform
 
@@ -149,9 +166,15 @@ class Intersection(BasicScenario):
             print('pedestrian', pedestrian_actor, '(', pedestrian_generated_transform.location.x, pedestrian_generated_transform.location.y, ')')
 
 
-        for vehicle_i in self.customized_data['vehicle_list']:
+        for i, vehicle_i in enumerate(self.customized_data['vehicle_list']):
             if 'add_center' in self.customized_data and self.customized_data['add_center']:
-                vehicle_spawn_transform_i = add_transform(self.customized_data['center_transform'], vehicle_i.spawn_transform)
+                if 'vehicle_center_transforms' in self.customized_data and i in self.customized_data['vehicle_center_transforms']:
+                     x, y = self.customized_data['vehicle_center_transforms'][i]
+                     center_transform = create_transform(x, y, 0, 0, 0, 0)
+                else:
+                    center_transform = self.customized_data['center_transform']
+
+                vehicle_spawn_transform_i = add_transform(center_transform, vehicle_i.spawn_transform)
             else:
                 vehicle_spawn_transform_i = vehicle_i.spawn_transform
 
