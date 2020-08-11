@@ -94,7 +94,7 @@ class Intersection(BasicScenario):
 
     def _request_actor(self, actor_category, actor_model, waypoint_transform, simulation_enabled=False, color=None):
         # If we fail too many times, this will break and the session will be assigned the lowest default score. We do this to disencourage samples that result in invalid locations
-        
+
         # Number of attempts made so far
         _spawn_attempted = 0
 
@@ -126,11 +126,13 @@ class Intersection(BasicScenario):
                     if _spawn_attempted == self._number_of_attempts:
                         waypoint = self._wmap.get_waypoint(waypoint_transform.location, project_to_road=True, lane_type=carla.LaneType.Any)
                         added_dist = 0
-                    if _spawn_attempted >= self._number_of_attempts+3:
+                    if _spawn_attempted >= self._number_of_attempts+10:
                         print('tried too many times, break')
                         running = False
-
-        actor_object.set_simulate_physics(enabled=simulation_enabled)
+        if running:
+            actor_object.set_simulate_physics(enabled=simulation_enabled)
+        else:
+            actor_object = None
         return actor_object, generated_transform
 
     def _initialize_actors(self, config):
@@ -157,8 +159,9 @@ class Intersection(BasicScenario):
 
             static_actor, static_generated_transform = self._request_actor('static', static_i.model, static_spawn_transform_i, True)
 
-            self.static_list.append((static_actor, static_generated_transform))
-            print('static', static_actor, '(', static_generated_transform.location.x, static_generated_transform.location.y, ')')
+            if static_actor and static_generated_transform:
+                self.static_list.append((static_actor, static_generated_transform))
+                print('static', static_actor, '(', static_generated_transform.location.x, static_generated_transform.location.y, ')')
 
 
         for i, pedestrian_i in enumerate(self.customized_data['pedestrian_list']):
@@ -175,8 +178,9 @@ class Intersection(BasicScenario):
 
             pedestrian_actor, pedestrian_generated_transform = self._request_actor('pedestrian', pedestrian_i.model, pedestrian_spawn_transform_i)
 
-            self.pedestrian_list.append((pedestrian_actor, pedestrian_generated_transform))
-            print('pedestrian', pedestrian_actor, '(', pedestrian_generated_transform.location.x, pedestrian_generated_transform.location.y, ')')
+            if pedestrian_actor and pedestrian_generated_transform:
+                self.pedestrian_list.append((pedestrian_actor, pedestrian_generated_transform))
+                print('pedestrian', pedestrian_actor, '(', pedestrian_generated_transform.location.x, pedestrian_generated_transform.location.y, ')')
 
 
         for i, vehicle_i in enumerate(self.customized_data['vehicle_list']):
@@ -193,10 +197,11 @@ class Intersection(BasicScenario):
 
             vehicle_actor, vehicle_generated_transform = self._request_actor('vehicle', vehicle_i.model, vehicle_spawn_transform_i, True, vehicle_i.color)
 
-            if hasattr(vehicle_i, 'color'):
-                vehicle_actor.color = vehicle_i.color
-            self.vehicle_list.append((vehicle_actor, vehicle_generated_transform))
-            print('vehicle', vehicle_actor, '(', vehicle_generated_transform.location.x, vehicle_generated_transform.location.y, ')')
+            if vehicle_actor and vehicle_generated_transform:
+                if hasattr(vehicle_i, 'color'):
+                    vehicle_actor.color = vehicle_i.color
+                self.vehicle_list.append((vehicle_actor, vehicle_generated_transform))
+                print('vehicle', vehicle_actor, '(', vehicle_generated_transform.location.x, vehicle_generated_transform.location.y, ')')
 
 
     def _create_behavior(self):
