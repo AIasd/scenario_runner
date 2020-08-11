@@ -93,6 +93,8 @@ class Intersection(BasicScenario):
 
 
     def _request_actor(self, actor_category, actor_model, waypoint_transform, simulation_enabled=False, color=None):
+        # If we fail too many times, this will break and the session will be assigned the lowest default score. We do this to disencourage samples that result in invalid locations
+        
         # Number of attempts made so far
         _spawn_attempted = 0
 
