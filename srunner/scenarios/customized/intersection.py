@@ -32,9 +32,7 @@ def get_generated_transform(added_dist, waypoint):
     """
     Calculate the transform of the adversary
     """
-    if not waypoint:
-        raise RuntimeError("Cannot get next waypoint !")
-    elif added_dist == 0:
+    if added_dist == 0:
         return waypoint.transform
 
     _wp = waypoint.next(added_dist)
@@ -101,6 +99,8 @@ class Intersection(BasicScenario):
         waypoint = self._wmap.get_waypoint(waypoint_transform.location, project_to_road=False, lane_type=carla.LaneType.Any)
         added_dist = 0
 
+        generated_transform = None
+
         running = True
         while running:
             # Try to spawn the actor
@@ -113,9 +113,10 @@ class Intersection(BasicScenario):
                 break
 
             # Move the spawning point a bit and try again
-            except RuntimeError as r:
+            except (RuntimeError, AttributeError) as r:
                 # In the case there is an object just move a little bit and retry
-                print(" Base transform is blocking object", actor_model, 'at', '(', generated_transform.location.x, generated_transform.location.y, ')', ', attempted:', _spawn_attempted)
+                if generated_transform:
+                    print(" Base transform is blocking object", actor_model, 'at', '(', generated_transform.location.x, generated_transform.location.y, ')', ', attempted:', _spawn_attempted)
                 added_dist += 0.5
                 _spawn_attempted += 1
                 if _spawn_attempted >= self._number_of_attempts:
