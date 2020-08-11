@@ -32,7 +32,9 @@ def get_generated_transform(added_dist, waypoint):
     """
     Calculate the transform of the adversary
     """
-    if added_dist == 0:
+    if not waypoint:
+        raise RuntimeError("Cannot get next waypoint !")
+    elif added_dist == 0:
         return waypoint.transform
 
     _wp = waypoint.next(added_dist)
@@ -98,7 +100,9 @@ class Intersection(BasicScenario):
 
         waypoint = self._wmap.get_waypoint(waypoint_transform.location, project_to_road=False, lane_type=carla.LaneType.Any)
         added_dist = 0
-        while True:
+
+        running = True
+        while running:
             # Try to spawn the actor
             try:
                 generated_transform = get_generated_transform(added_dist, waypoint)
@@ -116,7 +120,12 @@ class Intersection(BasicScenario):
                 _spawn_attempted += 1
                 if _spawn_attempted >= self._number_of_attempts:
                     print('fail to generate object', actor_model, 'at', '(', waypoint_transform.location.x, waypoint_transform.location.y, ')', 'project to road!!!')
-                    waypoint = self._wmap.get_waypoint(waypoint_transform.location, project_to_road=True, lane_type=carla.LaneType.Any)
+                    if _spawn_attempted == self._number_of_attempts:
+                        waypoint = self._wmap.get_waypoint(waypoint_transform.location, project_to_road=True, lane_type=carla.LaneType.Any)
+                        added_dist = 0
+                    if _spawn_attempted >= self._number_of_attempts+3:
+                        print('tried too many times, break')
+                        running = False
 
         actor_object.set_simulate_physics(enabled=simulation_enabled)
         return actor_object, generated_transform
