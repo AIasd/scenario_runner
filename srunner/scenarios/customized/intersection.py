@@ -27,6 +27,7 @@ from srunner.tools.scenario_helper import generate_target_waypoint, generate_tar
 from customized_utils import visualize_route, perturb_route, add_transform, create_transform
 
 from leaderboard.utils.route_manipulation import interpolate_trajectory, downsample_route
+import numpy as np
 
 def get_generated_transform(added_dist, waypoint):
     """
@@ -92,10 +93,13 @@ class Intersection(BasicScenario):
                                                   criteria_enable=criteria_enable)
 
 
-    def _request_actor(self, actor_category, actor_model, waypoint_transform, simulation_enabled=False, color=None):
+    def _request_actor(self, actor_category, actor_model, waypoint_transform, simulation_enabled=False, color=None, bounds=None):
         # If we fail too many times, this will break and the session will be assigned the lowest default score. We do this to disencourage samples that result in invalid locations
 
         # Number of attempts made so far
+        if bounds:
+            x_min, x_max, y_min, y_max = bounds
+
         _spawn_attempted = 0
 
         waypoint = self._wmap.get_waypoint(waypoint_transform.location, project_to_road=False, lane_type=carla.LaneType.Any)
@@ -108,6 +112,15 @@ class Intersection(BasicScenario):
             # Try to spawn the actor
             try:
                 generated_transform = get_generated_transform(added_dist, waypoint)
+
+                # project back to within-bounds
+                if bounds:
+                    g_x = generated_transform.location.x
+                    g_y = generated_transform.location.y
+                    generated_transform.location.x = np.max([g_x, x_min])
+                    generated_transform.location.x = np.min([g_x, x_max])
+                    generated_transform.location.y = np.max([g_y, y_min])
+                    generated_transform.location.y = np.min([g_y, y_max])
 
                 actor_object = CarlaDataProvider.request_new_actor(
                     model=actor_model, spawn_point=generated_transform, color=color, actor_category=actor_category)
@@ -142,66 +155,92 @@ class Intersection(BasicScenario):
         static_center_transforms, static_center_transforms, vehicle_center_transforms:
         {i:(x_i, y_i)}
         """
+        def spawning_actors_within_bounds(object_type):
+            if object_type == 'static':
+                object_list = self.static_list
+            elif object_type == 'pedestrian':
+                object_list = self.pedestrian_list
+            elif object_type == 'vehicle':
+                object_list = self.vehicle_list
 
+            for i, object_i in enumerate(self.customized_data[object_type+'_list']):
+                if 'add_center' in self.customized_data and self.customized_data['add_center']:
+                    key = object_type+'_center_transform'+'_'+str(i)
+                    if key in self.customized_data:
+                        center_transform = self.customized_data[key]
+                    else:
+                        center_transform = self.customized_data['center_transform']
 
-
-        for i, static_i in enumerate(self.customized_data['static_list']):
-            if 'add_center' in self.customized_data and self.customized_data['add_center']:
-                key = 'static_center_transform'+'_'+str(i)
-                if key in self.customized_data:
-                    center_transform = self.customized_data[key]
+                    spawn_transform_i = add_transform(center_transform, object_i.spawn_transform)
                 else:
-                    center_transform = self.customized_data['center_transform']
+                    spawn_transform_i = object_i.spawn_transform
 
-                static_spawn_transform_i = add_transform(center_transform, static_i.spawn_transform)
-            else:
-                static_spawn_transform_i = static_i.spawn_transform
-
-            static_actor, static_generated_transform = self._request_actor('static', static_i.model, static_spawn_transform_i, True)
-
-            if static_actor and static_generated_transform:
-                self.static_list.append((static_actor, static_generated_transform))
-                print('static', static_actor, '(', static_generated_transform.location.x, static_generated_transform.location.y, ')')
-
-
-        for i, pedestrian_i in enumerate(self.customized_data['pedestrian_list']):
-            if 'add_center' in self.customized_data and self.customized_data['add_center']:
-                key = 'pedestrian_center_transform'+'_'+str(i)
-                if key in self.customized_data:
-                    center_transform = self.customized_data[key]
+                if 'parameters_max_bounds' in self.customized_data.keys():
+                    # bounds = [self.customized_data[k1][object_type+'_'+k2+'_'+str(i)] for k1, k2 in [('parameters_min_bounds', 'x_min'), ('parameters_max_bounds', 'x_max'), ('parameters_min_bounds', 'y_min'), ('parameters_max_bounds', 'y_max')]]
+                    bounds = []
                 else:
-                    center_transform = self.customized_data['center_transform']
+                    bounds = []
 
-                pedestrian_spawn_transform_i = add_transform(center_transform, pedestrian_i.spawn_transform)
-            else:
-                pedestrian_spawn_transform_i = pedestrian_i.spawn_transform
-
-            pedestrian_actor, pedestrian_generated_transform = self._request_actor('pedestrian', pedestrian_i.model, pedestrian_spawn_transform_i)
-
-            if pedestrian_actor and pedestrian_generated_transform:
-                self.pedestrian_list.append((pedestrian_actor, pedestrian_generated_transform))
-                print('pedestrian', pedestrian_actor, '(', pedestrian_generated_transform.location.x, pedestrian_generated_transform.location.y, ')')
-
-
-        for i, vehicle_i in enumerate(self.customized_data['vehicle_list']):
-            if 'add_center' in self.customized_data and self.customized_data['add_center']:
-                key = 'vehicle_center_transform'+'_'+str(i)
-                if key in self.customized_data:
-                     center_transform = self.customized_data[key]
+                if object_type == 'vehicle' and hasattr(object_i, 'color'):
+                    color = object_i.color
                 else:
-                    center_transform = self.customized_data['center_transform']
+                    color = None
 
-                vehicle_spawn_transform_i = add_transform(center_transform, vehicle_i.spawn_transform)
-            else:
-                vehicle_spawn_transform_i = vehicle_i.spawn_transform
+                actor, generated_transform = self._request_actor(object_type, object_i.model, spawn_transform_i, True, color, bounds)
 
-            vehicle_actor, vehicle_generated_transform = self._request_actor('vehicle', vehicle_i.model, vehicle_spawn_transform_i, True, vehicle_i.color)
+                if actor and generated_transform:
 
-            if vehicle_actor and vehicle_generated_transform:
-                if hasattr(vehicle_i, 'color'):
-                    vehicle_actor.color = vehicle_i.color
-                self.vehicle_list.append((vehicle_actor, vehicle_generated_transform))
-                print('vehicle', vehicle_actor, '(', vehicle_generated_transform.location.x, vehicle_generated_transform.location.y, ')')
+
+                    object_list.append((actor, generated_transform))
+
+                    print(object_type, actor, '(', generated_transform.location.x, generated_transform.location.y, ')')
+
+
+        for object_type in ['static', 'pedestrian', 'vehicle']:
+            spawning_actors_within_bounds(object_type)
+
+
+
+
+
+        # for i, pedestrian_i in enumerate(self.customized_data['pedestrian_list']):
+        #     if 'add_center' in self.customized_data and self.customized_data['add_center']:
+        #         key = 'pedestrian_center_transform'+'_'+str(i)
+        #         if key in self.customized_data:
+        #             center_transform = self.customized_data[key]
+        #         else:
+        #             center_transform = self.customized_data['center_transform']
+        #
+        #         pedestrian_spawn_transform_i = add_transform(center_transform, pedestrian_i.spawn_transform)
+        #     else:
+        #         pedestrian_spawn_transform_i = pedestrian_i.spawn_transform
+        #
+        #     pedestrian_actor, pedestrian_generated_transform = self._request_actor('pedestrian', pedestrian_i.model, pedestrian_spawn_transform_i)
+        #
+        #     if pedestrian_actor and pedestrian_generated_transform:
+        #         self.pedestrian_list.append((pedestrian_actor, pedestrian_generated_transform))
+        #         print('pedestrian', pedestrian_actor, '(', pedestrian_generated_transform.location.x, pedestrian_generated_transform.location.y, ')')
+        #
+        #
+        # for i, vehicle_i in enumerate(self.customized_data['vehicle_list']):
+        #     if 'add_center' in self.customized_data and self.customized_data['add_center']:
+        #         key = 'vehicle_center_transform'+'_'+str(i)
+        #         if key in self.customized_data:
+        #              center_transform = self.customized_data[key]
+        #         else:
+        #             center_transform = self.customized_data['center_transform']
+        #
+        #         vehicle_spawn_transform_i = add_transform(center_transform, vehicle_i.spawn_transform)
+        #     else:
+        #         vehicle_spawn_transform_i = vehicle_i.spawn_transform
+        #
+        #     vehicle_actor, vehicle_generated_transform = self._request_actor('vehicle', vehicle_i.model, vehicle_spawn_transform_i, True, vehicle_i.color)
+        #
+        #     if vehicle_actor and vehicle_generated_transform:
+        #         if hasattr(vehicle_i, 'color'):
+        #             vehicle_actor.color = vehicle_i.color
+        #         self.vehicle_list.append((vehicle_actor, vehicle_generated_transform))
+        #         print('vehicle', vehicle_actor, '(', vehicle_generated_transform.location.x, vehicle_generated_transform.location.y, ')')
 
 
     def _create_behavior(self):
