@@ -84,3 +84,6 @@ class ScenarioConfiguration(object):
     friction = None
     subtype = None
     route_var_name = None
+
+    # addition
+    cur_server_port = None

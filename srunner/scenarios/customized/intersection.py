@@ -24,10 +24,13 @@ from srunner.scenariomanager.timer import TimeOut
 from srunner.scenarios.basic_scenario import BasicScenario
 from srunner.tools.scenario_helper import generate_target_waypoint, generate_target_waypoint_in_route
 
-from customized_utils import visualize_route, perturb_route, add_transform, create_transform
+from customized_utils import visualize_route, perturb_route, add_transform, create_transform, make_hierarchical_dir, copy_transform
 
 from leaderboard.utils.route_manipulation import interpolate_trajectory, downsample_route
 import numpy as np
+from collections import OrderedDict
+import pickle
+import os
 
 def get_generated_transform(added_dist, waypoint):
     """
@@ -84,7 +87,6 @@ class Intersection(BasicScenario):
         self.static_list = []
         self.pedestrian_list = []
         self.vehicle_list = []
-
         super(Intersection, self).__init__("Intersection",
                                                   ego_vehicles,
                                                   config,
@@ -93,59 +95,135 @@ class Intersection(BasicScenario):
                                                   criteria_enable=criteria_enable)
 
 
-    def _request_actor(self, actor_category, actor_model, waypoint_transform, simulation_enabled=False, color=None, bounds=None):
+    def _request_actor(self, actor_category, actor_model, waypoint_transform, simulation_enabled=False, color=None, bounds=None, is_waypoint_follower=None):
+        def bound_xy(generated_transform, bounds):
+            if bounds:
+                x_min, x_max, y_min, y_max = bounds
+                g_x = generated_transform.location.x
+                g_y = generated_transform.location.y
+                generated_transform.location.x = np.max([g_x, x_min])
+                generated_transform.location.x = np.min([g_x, x_max])
+                generated_transform.location.y = np.max([g_y, y_min])
+                generated_transform.location.y = np.min([g_y, y_max])
+
         # If we fail too many times, this will break and the session will be assigned the lowest default score. We do this to disencourage samples that result in invalid locations
 
         # Number of attempts made so far
-        if bounds:
-            x_min, x_max, y_min, y_max = bounds
+        status = 'success'
+        is_success = False
 
-        _spawn_attempted = 0
+        generated_transform = copy_transform(waypoint_transform)
 
-        waypoint = self._wmap.get_waypoint(waypoint_transform.location, project_to_road=False, lane_type=carla.LaneType.Any)
-        added_dist = 0
 
-        generated_transform = None
+        if actor_category != 'vehicle':
+            g_x = generated_transform.location.x
+            g_y = generated_transform.location.y
+            g_yaw = generated_transform.rotation.yaw
+            for i in range(self._number_of_attempts):
+                for j in range(2):
+                    try:
+                        added_dist = i*0.5
+                        cur_x = g_x + np.random.uniform(0, added_dist)
+                        cur_y = g_y + np.random.uniform(0, added_dist)
+                        cur_t = create_transform(cur_x, cur_y, 0, 0, g_yaw, 0)
+                        generated_transform.location.y += np.random.uniform(0, 1)
+                        bound_xy(generated_transform, bounds)
+                        actor_object = CarlaDataProvider.request_new_actor(
+                            model=actor_model, spawn_point=cur_t, color=color, actor_category=actor_category)
+                        print('yaw', waypoint_transform.rotation.yaw, '->', generated_transform.rotation.yaw, '->', actor_object.get_transform().rotation.yaw)
+                        is_success = True
+                        break
+                    except (RuntimeError, AttributeError) as r:
+                        status = 'fail_1_'+str(i)
+                if is_success:
+                    break
 
-        running = True
-        while running:
-            # Try to spawn the actor
-            try:
-                generated_transform = get_generated_transform(added_dist, waypoint)
+        if actor_category == 'vehicle' or status == 'fail_1_'+str(self._number_of_attempts):
 
-                # project back to within-bounds
-                if bounds:
-                    g_x = generated_transform.location.x
-                    g_y = generated_transform.location.y
-                    generated_transform.location.x = np.max([g_x, x_min])
-                    generated_transform.location.x = np.min([g_x, x_max])
-                    generated_transform.location.y = np.max([g_y, y_min])
-                    generated_transform.location.y = np.min([g_y, y_max])
 
-                actor_object = CarlaDataProvider.request_new_actor(
-                    model=actor_model, spawn_point=generated_transform, color=color, actor_category=actor_category)
+            for i in range(self._number_of_attempts):
+                try:
+                    added_dist = i*0.5
+                    waypoint = self._wmap.get_waypoint(waypoint_transform.location, project_to_road=True, lane_type=carla.LaneType.Any)
+                    generated_transform = get_generated_transform(added_dist, waypoint)
+                    if actor_category == 'vehicle' and is_waypoint_follower:
+                        generated_transform.rotation.yaw = waypoint_transform.rotation.yaw
+                    bound_xy(generated_transform, bounds)
 
-                break
+                    actor_object = CarlaDataProvider.request_new_actor(
+                        model=actor_model, spawn_point=generated_transform, color=color, actor_category=actor_category)
 
-            # Move the spawning point a bit and try again
-            except (RuntimeError, AttributeError) as r:
-                # In the case there is an object just move a little bit and retry
-                if generated_transform:
-                    print(" Base transform is blocking object", actor_model, 'at', '(', generated_transform.location.x, generated_transform.location.y, ')', ', attempted:', _spawn_attempted)
-                added_dist += 0.5
-                _spawn_attempted += 1
-                if _spawn_attempted >= self._number_of_attempts:
-                    print('fail to generate object', actor_model, 'at', '(', waypoint_transform.location.x, waypoint_transform.location.y, ')', 'project to road!!!')
-                    if _spawn_attempted == self._number_of_attempts:
-                        waypoint = self._wmap.get_waypoint(waypoint_transform.location, project_to_road=True, lane_type=carla.LaneType.Any)
-                        added_dist = 0
-                    if _spawn_attempted >= self._number_of_attempts+10:
-                        print('tried too many times, break')
-                        running = False
-        if running:
+                    is_success = True
+                    break
+                except (RuntimeError, AttributeError) as r:
+                    status = 'fail_2_'+str(i)
+
+
+
+
+
+
+        # while running:
+        #     # Try to spawn the actor
+        #     try:
+        #
+        #         if actor_category == 'vehicle':
+        #             waypoint = self._wmap.get_waypoint(waypoint_transform.location, project_to_road=True, lane_type=carla.LaneType.Any)
+        #             generated_transform = get_generated_transform(added_dist, waypoint)
+        #
+        #             # if not is_waypoint_follower:
+        #             #     print('\n'*5, 'waypoint_transform.yaw', waypoint_transform.yaw)
+        #             #     generated_transform.yaw = waypoint_transform.yaw
+        #
+        #
+        #         bound_xy(generated_transform, bounds)
+        #         actor_object = CarlaDataProvider.request_new_actor(
+        #             model=actor_model, spawn_point=generated_transform, color=color, actor_category=actor_category)
+        #
+        #         break
+        #
+        #     # Move the spawning point a bit and try again
+        #     except (RuntimeError, AttributeError) as r:
+        #         _spawn_attempted += 1
+        #         status = 'fail_stage_two_'+str(_spawn_attempted)
+        #
+        #         if actor_category == 'vehicle':
+        #             added_dist += 0.5
+        #             if _spawn_attempted >= self._number_of_attempts:
+        #                 status = 'fail_stage_three'
+        #                 running = False
+        #         else:
+        #             generated_transform.location.x += np.random.random()
+        #             generated_transform.location.y += np.random.random()
+        #
+        #             if _spawn_attempted == self._number_of_attempts-1:
+        #                 try:
+        #                     waypoint = self._wmap.get_waypoint(waypoint_transform.location, project_to_road=True, lane_type=carla.LaneType.Any)
+        #                     generated_transform = get_generated_transform(0, waypoint)
+        #                     generated_transform.yaw = waypoint_transform.yaw
+        #
+        #                     bound_xy(generated_transform, bounds)
+        #
+        #                     actor_object = CarlaDataProvider.request_new_actor(
+        #                         model=actor_model, spawn_point=generated_transform, color=color, actor_category=actor_category)
+        #
+        #                 except (RuntimeError, AttributeError) as r:
+        #                     status = 'fail_stage_three'
+        #                     running = False
+
+        if is_success:
             actor_object.set_simulate_physics(enabled=simulation_enabled)
         else:
             actor_object = None
+            generated_transform = None
+            status = 'fail_all'
+
+
+        if status != 'success' and is_success:
+            print('{} {} {} ({:.2f},{:.2f},{:.2f})->({:.2f},{:.2f},{:.2f})'.format(status, actor_model, is_waypoint_follower, waypoint_transform.location.x, waypoint_transform.location.y, waypoint_transform.rotation.yaw, generated_transform.location.x, generated_transform.location.y, waypoint_transform.rotation.yaw))
+        else:
+            print(status, actor_category, actor_model, is_waypoint_follower)
+
         return actor_object, generated_transform
 
     def _initialize_actors(self, config):
@@ -155,7 +233,9 @@ class Intersection(BasicScenario):
         static_center_transforms, static_center_transforms, vehicle_center_transforms:
         {i:(x_i, y_i)}
         """
+
         def spawning_actors_within_bounds(object_type):
+            final_generated_transforms = []
             if object_type == 'static':
                 object_list = self.static_list
             elif object_type == 'pedestrian':
@@ -171,6 +251,12 @@ class Intersection(BasicScenario):
                     else:
                         center_transform = self.customized_data['center_transform']
 
+                    # hack: only x, y should be added
+                    center_transform.rotation.z = 0
+                    center_transform.rotation.pitch = 0
+                    center_transform.rotation.yaw = 0
+                    center_transform.rotation.roll = 0
+
                     spawn_transform_i = add_transform(center_transform, object_i.spawn_transform)
                 else:
                     spawn_transform_i = object_i.spawn_transform
@@ -181,66 +267,58 @@ class Intersection(BasicScenario):
                 else:
                     bounds = []
 
-                if object_type == 'vehicle' and hasattr(object_i, 'color'):
+                if object_type == 'vehicle' and hasattr(object_i, 'color') and object_i.model != 'vehicle.tesla.cybertruck':
                     color = object_i.color
                 else:
                     color = None
 
-                actor, generated_transform = self._request_actor(object_type, object_i.model, spawn_transform_i, True, color, bounds)
+                if object_type == 'vehicle':
+                    is_waypoint_follower = object_i.waypoint_follower
+                else:
+                    is_waypoint_follower = None
+                actor, generated_transform = self._request_actor(object_type, object_i.model, spawn_transform_i, True, color, bounds, is_waypoint_follower)
 
                 if actor and generated_transform:
-
-
                     object_list.append((actor, generated_transform))
 
-                    print(object_type, actor, '(', generated_transform.location.x, generated_transform.location.y, ')')
+                    gx = generated_transform.location.x
+                    gy = generated_transform.location.y
+                    gyaw = generated_transform.rotation.yaw
+
+                    if 'add_center' in self.customized_data and self.customized_data['add_center']:
+                        cx = center_transform.location.x
+                        cy = center_transform.location.y
+                    else:
+                        cx = 0
+                        cy = 0
+
+                    final_generated_transforms.append((gx - cx, gy - cy, gyaw))
+                else:
+                    final_generated_transforms.append((None, None, None))
 
 
+            print(object_type, 'saved final generated transform', final_generated_transforms)
+            return final_generated_transforms
+
+
+
+        all_final_generated_transforms = OrderedDict()
         for object_type in ['static', 'pedestrian', 'vehicle']:
-            spawning_actors_within_bounds(object_type)
+            final_generated_transforms = spawning_actors_within_bounds(object_type)
+
+            all_final_generated_transforms[object_type] = final_generated_transforms
+
+        # hack:
+        tmp_folder = make_hierarchical_dir(['tmp_folder'])
+        filename = os.path.join(tmp_folder, str(config.cur_server_port)+'.pickle')
+
+        # print('filename', '\n'*10, filename, '\n'*10)
+        with open(filename, 'wb') as f_out:
+            pickle.dump(all_final_generated_transforms, f_out)
 
 
 
 
-
-        # for i, pedestrian_i in enumerate(self.customized_data['pedestrian_list']):
-        #     if 'add_center' in self.customized_data and self.customized_data['add_center']:
-        #         key = 'pedestrian_center_transform'+'_'+str(i)
-        #         if key in self.customized_data:
-        #             center_transform = self.customized_data[key]
-        #         else:
-        #             center_transform = self.customized_data['center_transform']
-        #
-        #         pedestrian_spawn_transform_i = add_transform(center_transform, pedestrian_i.spawn_transform)
-        #     else:
-        #         pedestrian_spawn_transform_i = pedestrian_i.spawn_transform
-        #
-        #     pedestrian_actor, pedestrian_generated_transform = self._request_actor('pedestrian', pedestrian_i.model, pedestrian_spawn_transform_i)
-        #
-        #     if pedestrian_actor and pedestrian_generated_transform:
-        #         self.pedestrian_list.append((pedestrian_actor, pedestrian_generated_transform))
-        #         print('pedestrian', pedestrian_actor, '(', pedestrian_generated_transform.location.x, pedestrian_generated_transform.location.y, ')')
-        #
-        #
-        # for i, vehicle_i in enumerate(self.customized_data['vehicle_list']):
-        #     if 'add_center' in self.customized_data and self.customized_data['add_center']:
-        #         key = 'vehicle_center_transform'+'_'+str(i)
-        #         if key in self.customized_data:
-        #              center_transform = self.customized_data[key]
-        #         else:
-        #             center_transform = self.customized_data['center_transform']
-        #
-        #         vehicle_spawn_transform_i = add_transform(center_transform, vehicle_i.spawn_transform)
-        #     else:
-        #         vehicle_spawn_transform_i = vehicle_i.spawn_transform
-        #
-        #     vehicle_actor, vehicle_generated_transform = self._request_actor('vehicle', vehicle_i.model, vehicle_spawn_transform_i, True, vehicle_i.color)
-        #
-        #     if vehicle_actor and vehicle_generated_transform:
-        #         if hasattr(vehicle_i, 'color'):
-        #             vehicle_actor.color = vehicle_i.color
-        #         self.vehicle_list.append((vehicle_actor, vehicle_generated_transform))
-        #         print('vehicle', vehicle_actor, '(', vehicle_generated_transform.location.x, vehicle_generated_transform.location.y, ')')
 
 
     def _create_behavior(self):
