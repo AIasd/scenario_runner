@@ -95,16 +95,24 @@ class Intersection(BasicScenario):
                                                   criteria_enable=criteria_enable)
 
 
-    def _request_actor(self, actor_category, actor_model, waypoint_transform, simulation_enabled=False, color=None, bounds=None, is_waypoint_follower=None):
+    def _request_actor(self, actor_category, actor_model, waypoint_transform, simulation_enabled=False, color=None, bounds=None, is_waypoint_follower=None, center_transform=None):
         def bound_xy(generated_transform, bounds):
             if bounds:
                 x_min, x_max, y_min, y_max = bounds
                 g_x = generated_transform.location.x
                 g_y = generated_transform.location.y
+                if center_transform:
+                    c_x = center_transform.location.x
+                    c_y = center_transform.location.y
+                    x_min += c_x
+                    x_max += c_x
+                    y_min += c_y
+                    y_max += c_y
                 generated_transform.location.x = np.max([g_x, x_min])
                 generated_transform.location.x = np.min([g_x, x_max])
                 generated_transform.location.y = np.max([g_y, y_min])
                 generated_transform.location.y = np.min([g_y, y_max])
+                # print('bounds', x_min, x_max, y_min, y_max, g_x, g_y, center_transform)
 
         # If we fail too many times, this will break and the session will be assigned the lowest default score. We do this to disencourage samples that result in invalid locations
 
@@ -130,7 +138,6 @@ class Intersection(BasicScenario):
                         bound_xy(generated_transform, bounds)
                         actor_object = CarlaDataProvider.request_new_actor(
                             model=actor_model, spawn_point=cur_t, color=color, actor_category=actor_category)
-                        print('yaw', waypoint_transform.rotation.yaw, '->', generated_transform.rotation.yaw, '->', actor_object.get_transform().rotation.yaw)
                         is_success = True
                         break
                     except (RuntimeError, AttributeError) as r:
@@ -148,8 +155,8 @@ class Intersection(BasicScenario):
                     generated_transform = get_generated_transform(added_dist, waypoint)
                     if actor_category == 'vehicle' and is_waypoint_follower:
                         generated_transform.rotation.yaw = waypoint_transform.rotation.yaw
-                    bound_xy(generated_transform, bounds)
 
+                    bound_xy(generated_transform, bounds)
                     actor_object = CarlaDataProvider.request_new_actor(
                         model=actor_model, spawn_point=generated_transform, color=color, actor_category=actor_category)
 
@@ -158,58 +165,6 @@ class Intersection(BasicScenario):
                 except (RuntimeError, AttributeError) as r:
                     status = 'fail_2_'+str(i)
 
-
-
-
-
-
-        # while running:
-        #     # Try to spawn the actor
-        #     try:
-        #
-        #         if actor_category == 'vehicle':
-        #             waypoint = self._wmap.get_waypoint(waypoint_transform.location, project_to_road=True, lane_type=carla.LaneType.Any)
-        #             generated_transform = get_generated_transform(added_dist, waypoint)
-        #
-        #             # if not is_waypoint_follower:
-        #             #     print('\n'*5, 'waypoint_transform.yaw', waypoint_transform.yaw)
-        #             #     generated_transform.yaw = waypoint_transform.yaw
-        #
-        #
-        #         bound_xy(generated_transform, bounds)
-        #         actor_object = CarlaDataProvider.request_new_actor(
-        #             model=actor_model, spawn_point=generated_transform, color=color, actor_category=actor_category)
-        #
-        #         break
-        #
-        #     # Move the spawning point a bit and try again
-        #     except (RuntimeError, AttributeError) as r:
-        #         _spawn_attempted += 1
-        #         status = 'fail_stage_two_'+str(_spawn_attempted)
-        #
-        #         if actor_category == 'vehicle':
-        #             added_dist += 0.5
-        #             if _spawn_attempted >= self._number_of_attempts:
-        #                 status = 'fail_stage_three'
-        #                 running = False
-        #         else:
-        #             generated_transform.location.x += np.random.random()
-        #             generated_transform.location.y += np.random.random()
-        #
-        #             if _spawn_attempted == self._number_of_attempts-1:
-        #                 try:
-        #                     waypoint = self._wmap.get_waypoint(waypoint_transform.location, project_to_road=True, lane_type=carla.LaneType.Any)
-        #                     generated_transform = get_generated_transform(0, waypoint)
-        #                     generated_transform.yaw = waypoint_transform.yaw
-        #
-        #                     bound_xy(generated_transform, bounds)
-        #
-        #                     actor_object = CarlaDataProvider.request_new_actor(
-        #                         model=actor_model, spawn_point=generated_transform, color=color, actor_category=actor_category)
-        #
-        #                 except (RuntimeError, AttributeError) as r:
-        #                     status = 'fail_stage_three'
-        #                     running = False
 
         if is_success:
             actor_object.set_simulate_physics(enabled=simulation_enabled)
@@ -251,19 +206,22 @@ class Intersection(BasicScenario):
                     else:
                         center_transform = self.customized_data['center_transform']
 
+
                     # hack: only x, y should be added
-                    center_transform.rotation.z = 0
+                    center_transform.location.z = 0
                     center_transform.rotation.pitch = 0
                     center_transform.rotation.yaw = 0
                     center_transform.rotation.roll = 0
 
                     spawn_transform_i = add_transform(center_transform, object_i.spawn_transform)
+                    print(object_type, i, object_i.model, 'add center', object_i.spawn_transform, '->', spawn_transform_i)
                 else:
                     spawn_transform_i = object_i.spawn_transform
+                    center_transform = None
 
                 if 'parameters_max_bounds' in self.customized_data.keys():
-                    # bounds = [self.customized_data[k1][object_type+'_'+k2+'_'+str(i)] for k1, k2 in [('parameters_min_bounds', 'x_min'), ('parameters_max_bounds', 'x_max'), ('parameters_min_bounds', 'y_min'), ('parameters_max_bounds', 'y_max')]]
-                    bounds = []
+                    bounds = [self.customized_data[k1][object_type+'_'+k2+'_'+str(i)] for k1, k2 in [('parameters_min_bounds', 'x_min'), ('parameters_max_bounds', 'x_max'), ('parameters_min_bounds', 'y_min'), ('parameters_max_bounds', 'y_max')]]
+                    # bounds = []
                 else:
                     bounds = []
 
@@ -276,7 +234,12 @@ class Intersection(BasicScenario):
                     is_waypoint_follower = object_i.waypoint_follower
                 else:
                     is_waypoint_follower = None
-                actor, generated_transform = self._request_actor(object_type, object_i.model, spawn_transform_i, True, color, bounds, is_waypoint_follower)
+
+                if object_type == 'pedestrian':
+                    simulation_enabled = False
+                else:
+                    simulation_enabled = True
+                actor, generated_transform = self._request_actor(object_type, object_i.model, spawn_transform_i, simulation_enabled, color, bounds, is_waypoint_follower, center_transform)
 
                 if actor and generated_transform:
                     object_list.append((actor, generated_transform))
@@ -297,7 +260,7 @@ class Intersection(BasicScenario):
                     final_generated_transforms.append((None, None, None))
 
 
-            print(object_type, 'saved final generated transform', final_generated_transforms)
+            # print(object_type, 'saved final generated transform', final_generated_transforms)
             return final_generated_transforms
 
 
