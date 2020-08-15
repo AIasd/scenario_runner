@@ -329,7 +329,11 @@ class CollisionTest(Criterion):
         if self._terminate_on_failure and (self.test_status == "FAILURE"):
             new_status = py_trees.common.Status.FAILURE
 
+        # hack:
         actor_location = CarlaDataProvider.get_location(self.actor)
+        if actor_location:
+            self.latest_actor_location = actor_location
+
         new_registered_collisions = []
 
         # Loops through all the previous registered collisions
@@ -425,7 +429,10 @@ class CollisionTest(Criterion):
         if not self:
             return
 
+        # hack:
         actor_location = CarlaDataProvider.get_location(self.actor)
+        if actor_location:
+            self.latest_actor_location = actor_location
 
         # Ignore the current one if it is the same id as before
         if self.last_id == event.other_actor.id:
@@ -538,16 +545,21 @@ class CollisionTest(Criterion):
 
         collision_event = TrafficEvent(event_type=actor_type)
 
+        # hack:
         actor_location = CarlaDataProvider.get_location(self.actor)
-
         if actor_location:
-            a_x = actor_location.x
-            a_y = actor_location.y
-            a_z = actor_location.z
+            self.latest_actor_location = actor_location
+
+        actor_location = self.latest_actor_location
+
+        a_x = round(actor_location.x, ROUND_PREC)
+        a_y = round(actor_location.y, ROUND_PREC)
+        a_z = round(actor_location.z, ROUND_PREC)
+        if other_actor_linear_speed:
+            other_actor_linear_speed = round(other_actor_linear_speed, ROUND_PREC)
         else:
-            a_x = None
-            a_y = None
-            a_z = None
+            other_actor_linear_speed = -1
+
 
         collision_event.set_dict({
             'type': event.other_actor.type_id,
@@ -561,11 +573,11 @@ class CollisionTest(Criterion):
             "Agent collided against object with type={} and id={} at (x={}, y={}, z={}, ego_linear_speed={}, other_actor_linear_speed={})".format(
                 event.other_actor.type_id,
                 event.other_actor.id,
-                round(a_x, ROUND_PREC),
-                round(a_y, ROUND_PREC),
-                round(a_z, ROUND_PREC),
+                a_x,
+                a_y,
+                a_z,
                 round(ego_linear_speed, ROUND_PREC),
-                round(other_actor_linear_speed, ROUND_PREC)))
+                other_actor_linear_speed))
 
         self.test_status = "FAILURE"
         self.actual_value += 1
@@ -820,12 +832,10 @@ class OffRoadTest(Criterion):
         )
         if drive_waypoint or park_waypoint:
             self._offroad = False
-            self.valid_location = current_location
         else:
             self.offroad_location = current_location
             self._offroad = True
             self.actual_value += 1
-            self.offroad_dist = self.offroad_location.distance(self.valid_location)
 
         # Counts the time offroad
         if self._offroad:
@@ -873,11 +883,10 @@ class OffRoadTest(Criterion):
         Sets the message of the event
         """
         event.set_message(
-            "Agent goes off road at (x={}, y={}, z={}, offroad distance={}). ".format(
+            "Agent goes off road at (x={}, y={}, z={}). ".format(
                 round(location.x, ROUND_PREC),
                 round(location.y, ROUND_PREC),
-                round(location.z, ROUND_PREC),
-                self.offroad_dist))
+                round(location.z, ROUND_PREC)))
 
     def _set_event_dict(self, event, location):
         """
@@ -886,8 +895,7 @@ class OffRoadTest(Criterion):
         event.set_dict({
             'x': location.x,
             'y': location.y,
-            'z': location.z,
-            'offroad_dist': self.offroad_dist})
+            'z': location.z})
 
 
 

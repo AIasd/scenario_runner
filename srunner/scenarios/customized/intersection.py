@@ -214,7 +214,7 @@ class Intersection(BasicScenario):
                     center_transform.rotation.roll = 0
 
                     spawn_transform_i = add_transform(center_transform, object_i.spawn_transform)
-                    print(object_type, i, object_i.model, 'add center', object_i.spawn_transform, '->', spawn_transform_i)
+                    # print(object_type, i, object_i.model, 'add center', object_i.spawn_transform, '->', spawn_transform_i)
                 else:
                     spawn_transform_i = object_i.spawn_transform
                     center_transform = None
