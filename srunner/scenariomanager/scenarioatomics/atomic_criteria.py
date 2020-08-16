@@ -319,7 +319,8 @@ class CollisionTest(Criterion):
         self.registered_collisions = []
         self.last_id = None
         self.collision_time = None
-
+        self.latest_actor_location = None
+        
     def update(self):
         """
         Check collision count
