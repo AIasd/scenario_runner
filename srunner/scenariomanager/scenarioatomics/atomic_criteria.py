@@ -550,11 +550,16 @@ class CollisionTest(Criterion):
         if actor_location:
             self.latest_actor_location = actor_location
 
-        actor_location = self.latest_actor_location
+        if self.latest_actor_location:
+            actor_location = self.latest_actor_location
+            a_x = round(actor_location.x, ROUND_PREC)
+            a_y = round(actor_location.y, ROUND_PREC)
+            a_z = round(actor_location.z, ROUND_PREC)
+        else:
+            a_x = -1
+            a_y = -1
+            a_z = -1
 
-        a_x = round(actor_location.x, ROUND_PREC)
-        a_y = round(actor_location.y, ROUND_PREC)
-        a_z = round(actor_location.z, ROUND_PREC)
         if other_actor_linear_speed:
             other_actor_linear_speed = round(other_actor_linear_speed, ROUND_PREC)
         else:
