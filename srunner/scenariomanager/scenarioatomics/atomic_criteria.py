@@ -319,8 +319,8 @@ class CollisionTest(Criterion):
         self.registered_collisions = []
         self.last_id = None
         self.collision_time = None
-        self.latest_actor_location = None
-        
+        # self.latest_actor_location = None
+
     def update(self):
         """
         Check collision count
@@ -332,21 +332,22 @@ class CollisionTest(Criterion):
 
         # hack:
         actor_location = CarlaDataProvider.get_location(self.actor)
-        if actor_location:
-            self.latest_actor_location = actor_location
+        # if actor_location:
+        #     self.latest_actor_location = actor_location
 
         new_registered_collisions = []
 
         # Loops through all the previous registered collisions
         for collision_location in self.registered_collisions:
+            # make sure both are not None
+            if actor_location and collision_location:
+                # Get the distance to the collision point
+                distance_vector = actor_location - collision_location
+                distance = math.sqrt(math.pow(distance_vector.x, 2) + math.pow(distance_vector.y, 2))
 
-            # Get the distance to the collision point
-            distance_vector = actor_location - collision_location
-            distance = math.sqrt(math.pow(distance_vector.x, 2) + math.pow(distance_vector.y, 2))
-
-            # If far away from a previous collision, forget it
-            if distance <= self.MAX_AREA_OF_COLLISION:
-                new_registered_collisions.append(collision_location)
+                # If far away from a previous collision, forget it
+                if distance <= self.MAX_AREA_OF_COLLISION:
+                    new_registered_collisions.append(collision_location)
 
         self.registered_collisions = new_registered_collisions
 
@@ -432,8 +433,8 @@ class CollisionTest(Criterion):
 
         # hack:
         actor_location = CarlaDataProvider.get_location(self.actor)
-        if actor_location:
-            self.latest_actor_location = actor_location
+        # if actor_location:
+        #     self.latest_actor_location = actor_location
 
         # Ignore the current one if it is the same id as before
         if self.last_id == event.other_actor.id:
@@ -455,12 +456,12 @@ class CollisionTest(Criterion):
 
         # Ignore it if its too close to a previous collision (avoid micro collisions)
         for collision_location in self.registered_collisions:
+            if actor_location and collision_location:
+                distance_vector = actor_location - collision_location
+                distance = math.sqrt(math.pow(distance_vector.x, 2) + math.pow(distance_vector.y, 2))
 
-            distance_vector = actor_location - collision_location
-            distance = math.sqrt(math.pow(distance_vector.x, 2) + math.pow(distance_vector.y, 2))
-
-            if distance <= self.MIN_AREA_OF_COLLISION:
-                return
+                if distance <= self.MIN_AREA_OF_COLLISION:
+                    return
 
 
         visible = False
@@ -546,13 +547,12 @@ class CollisionTest(Criterion):
 
         collision_event = TrafficEvent(event_type=actor_type)
 
+        if ego_linear_speed:
+            ego_linear_speed = round(ego_linear_speed, ROUND_PREC)
+        else:
+            ego_linear_speed = -1
         # hack:
-        actor_location = CarlaDataProvider.get_location(self.actor)
         if actor_location:
-            self.latest_actor_location = actor_location
-
-        if self.latest_actor_location:
-            actor_location = self.latest_actor_location
             a_x = round(actor_location.x, ROUND_PREC)
             a_y = round(actor_location.y, ROUND_PREC)
             a_z = round(actor_location.z, ROUND_PREC)
@@ -582,14 +582,16 @@ class CollisionTest(Criterion):
                 a_x,
                 a_y,
                 a_z,
-                round(ego_linear_speed, ROUND_PREC),
+                ego_linear_speed,
                 other_actor_linear_speed))
 
         self.test_status = "FAILURE"
         self.actual_value += 1
         self.collision_time = GameTime.get_time()
 
-        self.registered_collisions.append(actor_location)
+        # make sure it is not None
+        if actor_location:
+            self.registered_collisions.append(actor_location)
         self.list_traffic_events.append(collision_event)
 
 
