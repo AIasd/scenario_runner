@@ -153,8 +153,8 @@ class Intersection(BasicScenario):
                     added_dist = i*0.5
                     waypoint = self._wmap.get_waypoint(waypoint_transform.location, project_to_road=True, lane_type=carla.LaneType.Any)
                     generated_transform = get_generated_transform(added_dist, waypoint)
-                    if actor_category == 'vehicle' and is_waypoint_follower:
-                        generated_transform.rotation.yaw = waypoint_transform.rotation.yaw
+                    # if actor_category == 'vehicle' and is_waypoint_follower:
+                    generated_transform.rotation.yaw = waypoint_transform.rotation.yaw
 
                     bound_xy(generated_transform, bounds)
                     actor_object = CarlaDataProvider.request_new_actor(

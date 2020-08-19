@@ -524,7 +524,7 @@ class CarlaDataProvider(object):  # pylint: disable=too-many-public-methods
             _spawn_point.location.x = spawn_point.location.x
             _spawn_point.location.y = spawn_point.location.y
             # 0.2 -> 0.1
-            _spawn_point.location.z = spawn_point.location.z + 0.1
+            _spawn_point.location.z = spawn_point.location.z + 0.2
             actor = CarlaDataProvider._world.try_spawn_actor(blueprint, _spawn_point)
 
         if actor is None:
