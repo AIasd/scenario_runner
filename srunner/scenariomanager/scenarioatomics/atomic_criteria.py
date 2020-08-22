@@ -537,9 +537,7 @@ class CollisionTest(Criterion):
             print(event.other_actor.type_id)
             return
 
-        if not visible:
-            # print('miss'*100)
-            actor_type = TrafficEventType.COLLISION_INVISIBLE
+
 
 
         ego_linear_speed = CarlaDataProvider.get_velocity(self.actor)
@@ -564,6 +562,13 @@ class CollisionTest(Criterion):
         if other_actor_linear_speed:
             other_actor_linear_speed = round(other_actor_linear_speed, ROUND_PREC)
         else:
+            other_actor_linear_speed = -1
+
+
+        # hack: only count visible collisions
+        if not visible:
+            actor_type = TrafficEventType.COLLISION_INVISIBLE
+            ego_linear_speed = 0
             other_actor_linear_speed = -1
 
 
