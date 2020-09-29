@@ -16,15 +16,10 @@ import py_trees
 
 import carla
 
-from srunner.scenariomanager.carla_data_provider import CarlaDataProvider, CarlaActorPool
-from srunner.scenariomanager.scenarioatomics.atomic_behaviors import (ActorTransformSetter,
-                                                                      ActorDestroy,
-                                                                      KeepVelocity,
-                                                                      HandBrakeVehicle)
+from srunner.scenariomanager.carla_data_provider import CarlaDataProvider
+from srunner.scenariomanager.scenarioatomics.atomic_behaviors import (ActorTransformSetter, ActorDestroy, KeepVelocity, HandBrakeVehicle)
 from srunner.scenariomanager.scenarioatomics.atomic_criteria import CollisionTest
-from srunner.scenariomanager.scenarioatomics.atomic_trigger_conditions import (InTriggerDistanceToLocationAlongRoute,
-                                                                               InTriggerDistanceToVehicle,
-                                                                               DriveDistance)
+from srunner.scenariomanager.scenarioatomics.atomic_trigger_conditions import (InTriggerDistanceToLocationAlongRoute, InTriggerDistanceToVehicle, DriveDistance)
 from srunner.scenariomanager.timer import TimeOut
 from srunner.scenarios.basic_scenario import BasicScenario
 from srunner.tools.scenario_helper import generate_target_waypoint, generate_target_waypoint_in_route
@@ -165,8 +160,8 @@ class VehicleTurningRight(BasicScenario):
             # Try to spawn the actor
             try:
                 self._other_actor_transform = get_opponent_transform(added_dist, waypoint, self._trigger_location)
-                first_vehicle = CarlaActorPool.request_new_actor('vehicle.diamondback.century',
-                                                                 self._other_actor_transform)
+                first_vehicle = CarlaDataProvider.request_new_actor(
+                    'vehicle.diamondback.century', self._other_actor_transform)
                 first_vehicle.set_simulate_physics(enabled=False)
                 break
 
@@ -208,10 +203,7 @@ class VehicleTurningRight(BasicScenario):
         bycicle_start_dist = 13 + dist_to_travel
 
         if self._ego_route is not None:
-            trigger_distance = InTriggerDistanceToLocationAlongRoute(self.ego_vehicles[0],
-                                                                     self._ego_route,
-                                                                     self._other_actor_transform.location,
-                                                                     bycicle_start_dist)
+            trigger_distance = InTriggerDistanceToLocationAlongRoute(self.ego_vehicles[0], self._ego_route, self._other_actor_transform.location, bycicle_start_dist)
         else:
             trigger_distance = InTriggerDistanceToVehicle(self.other_actors[0],
                                                           self.ego_vehicles[0],
@@ -332,8 +324,8 @@ class VehicleTurningLeft(BasicScenario):
             # Try to spawn the actor
             try:
                 self._other_actor_transform = get_opponent_transform(added_dist, waypoint, self._trigger_location)
-                first_vehicle = CarlaActorPool.request_new_actor('vehicle.diamondback.century',
-                                                                 self._other_actor_transform)
+                first_vehicle = CarlaDataProvider.request_new_actor(
+                    'vehicle.diamondback.century', self._other_actor_transform)
                 first_vehicle.set_simulate_physics(enabled=False)
                 break
 
@@ -374,11 +366,9 @@ class VehicleTurningLeft(BasicScenario):
 
         bycicle_start_dist = 13 + dist_to_travel
 
+
         if self._ego_route is not None:
-            trigger_distance = InTriggerDistanceToLocationAlongRoute(self.ego_vehicles[0],
-                                                                     self._ego_route,
-                                                                     self._other_actor_transform.location,
-                                                                     bycicle_start_dist)
+            trigger_distance = InTriggerDistanceToLocationAlongRoute(self.ego_vehicles[0], self._ego_route, self._other_actor_transform.location, bycicle_start_dist)
         else:
             trigger_distance = InTriggerDistanceToVehicle(self.other_actors[0],
                                                           self.ego_vehicles[0],
@@ -402,8 +392,7 @@ class VehicleTurningLeft(BasicScenario):
 
         # building the tree
         root.add_child(scenario_sequence)
-        scenario_sequence.add_child(ActorTransformSetter(self.other_actors[0], self._other_actor_transform,
-                                                         name='TransformSetterTS4'))
+        scenario_sequence.add_child(ActorTransformSetter(self.other_actors[0], self._other_actor_transform, name='TransformSetterTS4'))
         scenario_sequence.add_child(HandBrakeVehicle(self.other_actors[0], True))
         scenario_sequence.add_child(trigger_distance)
         scenario_sequence.add_child(HandBrakeVehicle(self.other_actors[0], False))
@@ -450,11 +439,11 @@ class VehicleTurningRoute(BasicScenario):
     This is a single ego vehicle scenario
     """
 
-    def __init__(self, world, ego_vehicles, config, randomize=False, debug_mode=False, criteria_enable=True,
-                 timeout=60):
+    def __init__(self, world, ego_vehicles, config, randomize=False, debug_mode=False, criteria_enable=True, timeout=60, customized_data=None):
         """
         Setup all relevant parameters and create scenario
         """
+
 
         self._other_actor_target_velocity = 10
         self._wmap = CarlaDataProvider.get_map()
@@ -500,8 +489,7 @@ class VehicleTurningRoute(BasicScenario):
             # Try to spawn the actor
             try:
                 self._other_actor_transform = get_opponent_transform(added_dist, waypoint, self._trigger_location)
-                first_vehicle = CarlaActorPool.request_new_actor('vehicle.diamondback.century',
-                                                                 self._other_actor_transform)
+                first_vehicle = CarlaDataProvider.request_new_actor('vehicle.diamondback.century', self._other_actor_transform)
                 first_vehicle.set_simulate_physics(enabled=False)
                 break
 
@@ -522,6 +510,7 @@ class VehicleTurningRoute(BasicScenario):
             self._other_actor_transform.rotation)
         first_vehicle.set_transform(actor_transform)
         first_vehicle.set_simulate_physics(enabled=False)
+
         self.other_actors.append(first_vehicle)
 
     def _create_behavior(self):
@@ -543,10 +532,7 @@ class VehicleTurningRoute(BasicScenario):
         bycicle_start_dist = 13 + dist_to_travel
 
         if self._ego_route is not None:
-            trigger_distance = InTriggerDistanceToLocationAlongRoute(self.ego_vehicles[0],
-                                                                     self._ego_route,
-                                                                     self._other_actor_transform.location,
-                                                                     bycicle_start_dist)
+            trigger_distance = InTriggerDistanceToLocationAlongRoute(self.ego_vehicles[0], self._ego_route, self._other_actor_transform.location, bycicle_start_dist)
         else:
             trigger_distance = InTriggerDistanceToVehicle(self.other_actors[0],
                                                           self.ego_vehicles[0],
