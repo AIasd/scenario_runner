@@ -364,9 +364,13 @@ def generate_target_waypoint_in_route(waypoint, route):
 
     while True:
         # Get the next route location
-        index = min(index + 1, len(route))
+        # modification:
+        index = min(index + 1, len(route)-1)
+
+
         route_location = route[index][0]
         road_option = route[index][1]
+        # print(route[index], index, len(route), road_option)
 
         # Enter the junction
         if not reached_junction and (road_option in (RoadOption.LEFT, RoadOption.RIGHT, RoadOption.STRAIGHT)):
@@ -374,6 +378,10 @@ def generate_target_waypoint_in_route(waypoint, route):
 
         # End condition for the behavior, at the end of the junction
         if reached_junction and (road_option not in (RoadOption.LEFT, RoadOption.RIGHT, RoadOption.STRAIGHT)):
+            break
+
+        # addition
+        if index == len(route) - 1:
             break
 
     return wmap.get_waypoint(route_location)
