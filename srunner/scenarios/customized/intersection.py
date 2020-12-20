@@ -87,12 +87,18 @@ class Intersection(BasicScenario):
         self.static_list = []
         self.pedestrian_list = []
         self.vehicle_list = []
+        if 'tmp_travel_dist_file' in self.customized_data and os.path.exists(self.customized_data['tmp_travel_dist_file']):
+            os.remove(self.customized_data['tmp_travel_dist_file'])
+            print('remove tmp_travel_dist_file')
+
         super(Intersection, self).__init__("Intersection",
                                                   ego_vehicles,
                                                   config,
                                                   world,
                                                   debug_mode,
                                                   criteria_enable=criteria_enable)
+
+
 
 
     def _request_actor(self, actor_category, actor_model, waypoint_transform, simulation_enabled=False, color=None, bounds=None, is_waypoint_follower=None, center_transform=None):
@@ -287,6 +293,10 @@ class Intersection(BasicScenario):
     def _create_behavior(self):
         """
         """
+        def record_travel_dist(tmp_travel_dist_file, actor_id, actor_general_type, index):
+            with open(tmp_travel_dist_file, 'a') as f_out:
+                f_out.write(','.join([str(actor_id), actor_general_type, str(index)])+'\n')
+
         # building the tree
         scenario_sequence = py_trees.composites.Sequence()
         waypoint_events = py_trees.composites.Parallel(
@@ -302,9 +312,17 @@ class Intersection(BasicScenario):
 
 
 
+        tmp_travel_dist_file = None
+        if 'tmp_travel_dist_file' in self.customized_data:
+            tmp_travel_dist_file = self.customized_data['tmp_travel_dist_file']
+
         for i in range(len(self.pedestrian_list)):
             pedestrian_actor, pedestrian_generated_transform = self.pedestrian_list[i]
             pedestrian_info = self.customized_data['pedestrian_list'][i]
+
+            if tmp_travel_dist_file:
+                record_travel_dist(self.customized_data['tmp_travel_dist_file'], pedestrian_actor.id, 'pedestrian', i)
+                print('record_travel_dist tmp_travel_dist_file')
 
             trigger_distance = InTriggerDistanceToVehicle(self.ego_vehicles[0],
             pedestrian_actor, pedestrian_info.trigger_distance)
@@ -312,7 +330,7 @@ class Intersection(BasicScenario):
             movement = py_trees.composites.Parallel(policy=py_trees.common.ParallelPolicy.SUCCESS_ON_ONE)
 
             actor_velocity = KeepVelocity(pedestrian_actor, pedestrian_info.speed)
-            actor_traverse = DriveDistance(pedestrian_actor, pedestrian_info.dist_to_travel)
+            actor_traverse = DriveDistance(pedestrian_actor, pedestrian_info.dist_to_travel, tmp_travel_dist_file=tmp_travel_dist_file)
 
 
             movement.add_child(actor_velocity)
@@ -340,6 +358,10 @@ class Intersection(BasicScenario):
         for i in range(len(self.vehicle_list)):
             vehicle_actor, generated_transform = self.vehicle_list[i]
             vehicle_info = self.customized_data['vehicle_list'][i]
+
+            if tmp_travel_dist_file:
+                record_travel_dist(self.customized_data['tmp_travel_dist_file'], vehicle_actor.id, 'vehicle', i)
+                print('record_travel_dist tmp_travel_dist_file')
 
 
 
@@ -376,7 +398,7 @@ class Intersection(BasicScenario):
             else:
                 movement = py_trees.composites.Parallel(policy=py_trees.common.ParallelPolicy.SUCCESS_ON_ONE)
                 actor_velocity = KeepVelocity(vehicle_actor, vehicle_info.targeted_speed, target_direction=vehicle_info.target_direction)
-                actor_traverse = DriveDistance(vehicle_actor, vehicle_info.dist_to_travel)
+                actor_traverse = DriveDistance(vehicle_actor, vehicle_info.dist_to_travel, tmp_travel_dist_file=tmp_travel_dist_file)
                 movement.add_child(actor_velocity)
                 movement.add_child(actor_traverse)
 

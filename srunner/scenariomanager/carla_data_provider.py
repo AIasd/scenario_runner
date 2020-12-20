@@ -658,10 +658,41 @@ class CarlaDataProvider(object):  # pylint: disable=too-many-public-methods
             if spawn_point:
                 batch.append(SpawnActor(blueprint, spawn_point).then(SetAutopilot(FutureActor, autopilot)))
 
+
+
+
         actors = CarlaDataProvider.handle_actor_batch(batch)
 
         if actors is None:
             return None
+
+
+        ###############################################
+        # code for walker ai controllers: currently not working due to seg fault
+        if 'walker' in model:
+            walkers_list = []
+            for actor in actors:
+                walkers_list.append({"id": actor.id})
+            batch = []
+            walker_controller_bp = CarlaDataProvider._world.get_blueprint_library().find('controller.ai.walker')
+            for i in range(len(walkers_list)):
+                batch.append(SpawnActor(walker_controller_bp, carla.Transform(), walkers_list[i]["id"]))
+            actors_controllers = CarlaDataProvider.handle_actor_batch(batch)
+            for j, actor in enumerate(actors_controllers):
+                walkers_list[j]['con'] = actor.id
+            # CarlaDataProvider._world.wait_for_tick()
+            print('start')
+            for i in range(len(actors_controllers)):
+                print(i, '/', len(actors_controllers))
+                # start walker
+                actors_controllers[i].start()
+                # set walk to random point
+                actors_controllers[i].go_to_location(CarlaDataProvider._world.get_random_location_from_navigation())
+                # random max speed
+                actors_controllers[i].set_max_speed(1 + random.random())    # max speed between 1 and 2 (default is 1.4 m/s)
+            print('finish')
+        ###############################################
+
 
         for actor in actors:
             if actor is None:

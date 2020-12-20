@@ -1051,7 +1051,7 @@ class DriveDistance(AtomicCondition):
     The condition terminates with SUCCESS, when the actor drove at least the given distance
     """
 
-    def __init__(self, actor, distance, name="DriveDistance"):
+    def __init__(self, actor, distance, name="DriveDistance", tmp_travel_dist_file=None):
         """
         Setup parameters
         """
@@ -1061,6 +1061,7 @@ class DriveDistance(AtomicCondition):
         self._distance = 0
         self._location = None
         self._actor = actor
+        self.tmp_travel_dist_file = tmp_travel_dist_file
 
     def initialise(self):
         self._location = CarlaDataProvider.get_location(self._actor)
@@ -1075,6 +1076,10 @@ class DriveDistance(AtomicCondition):
         new_location = CarlaDataProvider.get_location(self._actor)
         self._distance += calculate_distance(self._location, new_location)
         self._location = new_location
+
+        if self.tmp_travel_dist_file:
+            with open(self.tmp_travel_dist_file, 'a') as f_out:
+                f_out.write(','.join([str(self._actor.id), str(self._distance)])+'\n')
 
         if self._distance > self._target_distance:
             new_status = py_trees.common.Status.SUCCESS

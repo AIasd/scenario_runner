@@ -473,7 +473,25 @@ class CollisionTest(Criterion):
 
         elif 'walker' in event.other_actor.type_id:
             actor_type = TrafficEventType.COLLISION_PEDESTRIAN
-            visible = True
+
+            # check if the collision is visible from the front central camera
+            target_location = event.other_actor.get_location()
+            ego_location = self.actor.get_location()
+            ego_orientation = self.actor.get_transform().rotation.yaw
+
+            target_vector = np.array([target_location.x - ego_location.x, target_location.y - ego_location.y])
+            norm_target = np.linalg.norm(target_vector)
+
+
+            forward_vector = np.array([math.cos(math.radians(ego_orientation)), math.sin(math.radians(ego_orientation))])
+            d_angle = math.degrees(math.acos(np.dot(forward_vector, target_vector) / norm_target))
+
+            half_fov = 45
+            if d_angle < half_fov:
+                visible = True
+            else:
+                visible = False
+
 
         elif 'vehicle' in event.other_actor.type_id:
             actor_type = TrafficEventType.COLLISION_VEHICLE
@@ -509,7 +527,10 @@ class CollisionTest(Criterion):
                 current_loc + carla.Location(-1 * x_boundary_vector + y_boundary_vector)]
 
             # dx, dy, dyaw
-            cameras_pos_offsets = [(1.3, 0.0, 0), (1.2, -0.25, -45), (1.2, 0.25, 45)]
+            # cameras_pos_offsets = [(1.3, 0.0, 0), (1.2, -0.25, -45), (1.2, 0.25, 45)]
+
+            # only keep the central camera
+            cameras_pos_offsets = [(1.3, 0.0, 0)]
 
 
             for offsets in cameras_pos_offsets:
