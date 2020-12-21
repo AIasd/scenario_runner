@@ -466,6 +466,15 @@ class CollisionTest(Criterion):
 
         visible = False
 
+        # hack: adjust to the front central camera's location
+        # this needs to be changed when the camera's location / fov change
+        dx = 1.3 * np.cos(np.deg2rad(ego_orientation-90))
+
+        ego_location = self.actor.get_location()
+        ego_x = ego_location.x+dx
+        ego_y = ego_location.y
+
+
         # modification: remove the second and part of if ('static' in event.other_actor.type_id or 'traffic' in event.other_actor.type_id) and 'sidewalk' not in event.other_actor.type_id
         if ('static' in event.other_actor.type_id or 'traffic' in event.other_actor.type_id):
             actor_type = TrafficEventType.COLLISION_STATIC
@@ -474,12 +483,12 @@ class CollisionTest(Criterion):
         elif 'walker' in event.other_actor.type_id:
             actor_type = TrafficEventType.COLLISION_PEDESTRIAN
 
+
             # check if the collision is visible from the front central camera
             target_location = event.other_actor.get_location()
-            ego_location = self.actor.get_location()
             ego_orientation = self.actor.get_transform().rotation.yaw
 
-            target_vector = np.array([target_location.x - ego_location.x, target_location.y - ego_location.y])
+            target_vector = np.array([target_location.x - ego_x, target_location.y - ego_y])
             norm_target = np.linalg.norm(target_vector)
 
 
@@ -526,34 +535,43 @@ class CollisionTest(Criterion):
                 current_loc + carla.Location(-1 * x_boundary_vector - y_boundary_vector),
                 current_loc + carla.Location(-1 * x_boundary_vector + y_boundary_vector)]
 
-            # dx, dy, dyaw
-            # cameras_pos_offsets = [(1.3, 0.0, 0), (1.2, -0.25, -45), (1.2, 0.25, 45)]
 
-            # only keep the central camera
-            cameras_pos_offsets = [(1.3, 0.0, 0)]
+            for bb in bbox:
+                target_location = bb
+                ego_orientation = self.actor.get_transform().rotation.yaw
+
+                target_vector = np.array([target_location.x - ego_x, target_location.y - ego_y])
+                norm_target = np.linalg.norm(target_vector)
 
 
-            for offsets in cameras_pos_offsets:
-                qx, qy, qyaw = offsets
-                origin = (ego_loc.x+qx, ego_loc.y+qy)
-                point = (origin[0]+ego_heading_vec.x, origin[1]+ego_heading_vec.y)
-                dxl, dyl = rotate(origin, point, -45+qyaw)
-                dxr, dyr = rotate(origin, point, 45+qyaw)
+                forward_vector = np.array([math.cos(math.radians(ego_orientation)), math.sin(math.radians(ego_orientation))])
+                d_angle = math.degrees(math.acos(np.dot(forward_vector, target_vector) / norm_target))
 
-                length = 300
-
-                left_point = (origin[0] + dxl * length, origin[1] + dyl * length)
-                right_point = (origin[0] + dxr * length, origin[1] + dyr * length)
-
-                for bb in bbox:
-                    point = (bb.x, bb.y)
-                    # print('bbox', left_point, right_point, origin, point)
-                    if inside_triangle(left_point, right_point, origin, point):
-                        visible = True
-                        # print('hit')
-                        break
-                if visible:
+                half_fov = 45
+                if d_angle < half_fov:
+                    visible = True
                     break
+
+
+
+            # origin = (ego_x, ego_y)
+            # point = (origin[0]+ego_heading_vec.x, origin[1]+ego_heading_vec.y)
+            # dxl, dyl = rotate(origin, point, -45)
+            # dxr, dyr = rotate(origin, point, 45)
+            #
+            # length = 300
+            #
+            # left_point = (origin[0] + dxl * length, origin[1] + dyl * length)
+            # right_point = (origin[0] + dxr * length, origin[1] + dyr * length)
+            #
+            # for bb in bbox:
+            #     point = (bb.x, bb.y)
+            #     # print('bbox', left_point, right_point, origin, point)
+            #     if inside_triangle(left_point, right_point, origin, point):
+            #         visible = True
+            #         # print('hit')
+            #         break
+
         else:
             print(event.other_actor.type_id)
             return
