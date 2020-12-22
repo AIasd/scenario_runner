@@ -468,6 +468,7 @@ class CollisionTest(Criterion):
 
         # hack: adjust to the front central camera's location
         # this needs to be changed when the camera's location / fov change
+        ego_orientation = self.actor.get_transform().rotation.yaw
         dx = 1.3 * np.cos(np.deg2rad(ego_orientation-90))
 
         ego_location = self.actor.get_location()
@@ -486,7 +487,7 @@ class CollisionTest(Criterion):
 
             # check if the collision is visible from the front central camera
             target_location = event.other_actor.get_location()
-            ego_orientation = self.actor.get_transform().rotation.yaw
+
 
             target_vector = np.array([target_location.x - ego_x, target_location.y - ego_y])
             norm_target = np.linalg.norm(target_vector)
