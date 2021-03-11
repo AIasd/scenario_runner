@@ -9,8 +9,6 @@
 This module provides the key configuration parameters for a scenario based on OpenSCENARIO
 """
 
-from __future__ import print_function
-
 import logging
 import os
 import xml.etree.ElementTree as ET
@@ -55,6 +53,8 @@ class OpenScenarioConfiguration(ScenarioConfiguration):
         logging.basicConfig()
         self.logger = logging.getLogger("[SR:OpenScenarioConfiguration]")
 
+        self._global_parameters = {}
+
         self._set_parameters()
         self._parse_openscenario_configuration()
 
@@ -82,6 +82,8 @@ class OpenScenarioConfiguration(ScenarioConfiguration):
         """
         Parse the given OpenSCENARIO config file, set and validate parameters
         """
+        OpenScenarioParser.set_osc_filepath(os.path.dirname(self._filename))
+
         self._check_version()
         self._load_catalogs()
         self._set_scenario_name()
@@ -182,13 +184,17 @@ class OpenScenarioConfiguration(ScenarioConfiguration):
         """
         Parse the complete scenario definition file, and replace all parameter references
         with the actual values
+
+        Set _global_parameters.
         """
 
-        self.xml_tree = OpenScenarioParser.set_parameters(self.xml_tree)
+        self.xml_tree, self._global_parameters = OpenScenarioParser.set_parameters(self.xml_tree)
 
         for elem in self.xml_tree.iter():
             if elem.find('ParameterDeclarations') is not None:
-                elem = OpenScenarioParser.set_parameters(elem)
+                elem, _ = OpenScenarioParser.set_parameters(elem)
+
+        OpenScenarioParser.set_global_parameters(self._global_parameters)
 
     def _set_actor_information(self):
         """
@@ -206,8 +212,7 @@ class OpenScenarioConfiguration(ScenarioConfiguration):
                     args[key] = value
 
                 for catalog_reference in obj.iter("CatalogReference"):
-                    entry = self.catalogs[catalog_reference.attrib.get(
-                        "catalogName")][catalog_reference.attrib.get("entryName")]
+                    entry = OpenScenarioParser.get_catalog_entry(self.catalogs, catalog_reference)
                     if entry.tag == "Vehicle":
                         self._extract_vehicle_information(entry, rolename, entry, args)
                     elif entry.tag == "Pedestrian":
@@ -215,7 +220,7 @@ class OpenScenarioConfiguration(ScenarioConfiguration):
                     elif entry.tag == "MiscObject":
                         self._extract_misc_information(entry, rolename, entry, args)
                     else:
-                        self.logger.error(
+                        self.logger.debug(
                             " A CatalogReference specifies a reference that is not an Entity. Skipping...")
 
                 for vehicle in obj.iter("Vehicle"):

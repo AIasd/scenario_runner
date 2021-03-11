@@ -366,9 +366,6 @@ class CollisionTest(Criterion):
             self._collision_sensor.destroy()
         self._collision_sensor = None
 
-        # Blackboard variable
-        blackv = py_trees.blackboard.Blackboard()
-        _ = blackv.set("Collision", self.actual_value)
         super(CollisionTest, self).terminate(new_status)
 
     @staticmethod
@@ -1519,10 +1516,6 @@ class OutsideRouteLanesTest(Criterion):
 
             percentage = self._wrong_distance / self._total_distance * 100
 
-            # Blackboard variable
-            blackv = py_trees.blackboard.Blackboard()
-            _ = blackv.set("OutsideRouteLanes", round(percentage, 2))
-
             outside_lane = TrafficEvent(event_type=TrafficEventType.OUTSIDE_ROUTE_LANES_INFRACTION)
             outside_lane.set_message(
                 "Agent went outside its route lanes for about {} meters "
@@ -1544,10 +1537,6 @@ class OutsideRouteLanesTest(Criterion):
             self._wrong_distance = 0
             self.list_traffic_events.append(outside_lane)
             self.actual_value = round(percentage, 2)
-        else:
-            # Blackboard variable
-            blackv = py_trees.blackboard.Blackboard()
-            _ = blackv.set("OutsideRouteLanes", 0)
 
         super(OutsideRouteLanesTest, self).terminate(new_status)
 
@@ -2020,6 +2009,7 @@ class RouteCompletionTest(Criterion):
                 route_completion_event.set_message("Destination was successfully reached")
                 self.list_traffic_events.append(route_completion_event)
                 self.test_status = "SUCCESS"
+                self._percentage_route_completed = 100
 
         elif self.test_status == "SUCCESS":
             new_status = py_trees.common.Status.SUCCESS
@@ -2033,9 +2023,6 @@ class RouteCompletionTest(Criterion):
         Set test status to failure if not successful and terminate
         """
         self.actual_value = round(self._percentage_route_completed, 2)
-        # Blackboard variable
-        blackv = py_trees.blackboard.Blackboard()
-        _ = blackv.set("RouteCompletion", round(self._percentage_route_completed, 2))
 
         if self.test_status == "INIT":
             self.test_status = "FAILURE"
@@ -2051,7 +2038,7 @@ class RunningRedLightTest(Criterion):
     - actor: CARLA actor to be used for this test
     - terminate_on_failure [optional]: If True, the complete scenario will terminate upon failure of this test
     """
-    DISTANCE_LIGHT = 10  # m
+    DISTANCE_LIGHT = 15  # m
 
     def __init__(self, actor, name="RunningRedLightTest", terminate_on_failure=False):
         """
@@ -2190,7 +2177,7 @@ class RunningRedLightTest(Criterion):
         rotate a given point by a given angle
         """
         x_ = math.cos(math.radians(angle)) * point.x - math.sin(math.radians(angle)) * point.y
-        y_ = math.sin(math.radians(angle)) * point.x - math.cos(math.radians(angle)) * point.y
+        y_ = math.sin(math.radians(angle)) * point.x + math.cos(math.radians(angle)) * point.y
         return carla.Vector3D(x_, y_, point.z)
 
     def get_traffic_light_waypoints(self, traffic_light):
@@ -2231,16 +2218,6 @@ class RunningRedLightTest(Criterion):
             wps.append(wpx)
 
         return area_loc, wps
-
-    def terminate(self, new_status):
-        """
-        If there is currently an event running, it is registered
-        """
-        # Blackboard variable
-        blackv = py_trees.blackboard.Blackboard()
-        _ = blackv.set("RunningRedLight", self.actual_value)
-
-        super(RunningRedLightTest, self).terminate(new_status)
 
 
 class RunningStopTest(Criterion):
@@ -2320,7 +2297,10 @@ class RunningStopTest(Criterion):
         waypoint = self._map.get_waypoint(current_location)
         for _ in range(multi_step):
             if waypoint:
-                waypoint = waypoint.next(self.WAYPOINT_STEP)[0]
+                next_wps = waypoint.next(self.WAYPOINT_STEP)
+                if not next_wps:
+                    break
+                waypoint = next_wps[0]
                 if not waypoint:
                     break
                 list_locations.append(waypoint.transform.location)
@@ -2417,13 +2397,3 @@ class RunningStopTest(Criterion):
         self.logger.debug("%s.update()[%s->%s]" % (self.__class__.__name__, self.status, new_status))
 
         return new_status
-
-    def terminate(self, new_status):
-        """
-        If there is currently an event running, it is registered
-        """
-        # Blackboard variable
-        blackv = py_trees.blackboard.Blackboard()
-        _ = blackv.set("RunningStop", self.actual_value)
-
-        super(RunningStopTest, self).terminate(new_status)

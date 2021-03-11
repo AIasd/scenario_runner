@@ -38,7 +38,7 @@ class NpcVehicleControl(BasicControl):
         self._local_planner = LocalPlanner(  # pylint: disable=undefined-variable
             self._actor, opt_dict={
                 'target_speed': self._target_speed * 3.6,
-                    'lateral_control_dict': self._args})
+                'lateral_control_dict': self._args})
 
         if self._waypoints:
             self._update_plan()
@@ -68,6 +68,9 @@ class NpcVehicleControl(BasicControl):
         """
         Execute on tick of the controller's control loop
 
+        Note: Negative target speeds are not yet supported.
+              Try using simple_vehicle_control or vehicle_longitudinal_control.
+
         If _waypoints are provided, the vehicle moves towards the next waypoint
         with the given _target_speed, until reaching the final waypoint. Upon reaching
         the final waypoint, _reached_goal is set to True.
@@ -79,17 +82,21 @@ class NpcVehicleControl(BasicControl):
         the initial actor velocity is maintained independent of physics.
         """
         self._reached_goal = False
-        self._local_planner.set_speed(self._target_speed * 3.6)
 
         if self._waypoints_updated:
             self._waypoints_updated = False
             self._update_plan()
 
+        target_speed = self._target_speed
+        # If target speed is negavite, raise an exception
+        if target_speed < 0:
+            raise NotImplementedError("Negative target speeds are not yet supported")
+
+        self._local_planner.set_speed(target_speed * 3.6)
         control = self._local_planner.run_step(debug=False)
 
         # Check if the actor reached the end of the plan
-        # @TODO replace access to private _waypoints_queue with public getter
-        if not self._local_planner._waypoints_queue:  # pylint: disable=protected-access
+        if self._local_planner.done():
             self._reached_goal = True
 
         self._actor.apply_control(control)
@@ -97,8 +104,10 @@ class NpcVehicleControl(BasicControl):
         if self._init_speed:
             current_speed = math.sqrt(self._actor.get_velocity().x**2 + self._actor.get_velocity().y**2)
 
-            if abs(self._target_speed - current_speed) > 3:
+            # If _init_speed is set, and the PID controller is not yet up to the point to take over,
+            # we manually set the vehicle to drive with the correct velocity
+            if abs(target_speed - current_speed) > 3:
                 yaw = self._actor.get_transform().rotation.yaw * (math.pi / 180)
-                vx = math.cos(yaw) * self._target_speed
-                vy = math.sin(yaw) * self._target_speed
-                self._actor.set_velocity(carla.Vector3D(vx, vy, 0))
+                vx = math.cos(yaw) * target_speed
+                vy = math.sin(yaw) * target_speed
+                self._actor.set_target_velocity(carla.Vector3D(vx, vy, 0))
