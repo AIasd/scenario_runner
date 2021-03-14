@@ -183,7 +183,7 @@ class Intersection(BasicScenario):
         if status != 'success' and is_success:
             print('{} {} {} ({:.2f},{:.2f},{:.2f})->({:.2f},{:.2f},{:.2f})'.format(status, actor_model, is_waypoint_follower, waypoint_transform.location.x, waypoint_transform.location.y, waypoint_transform.rotation.yaw, generated_transform.location.x, generated_transform.location.y, waypoint_transform.rotation.yaw))
         else:
-            print(status, actor_category, actor_model, is_waypoint_follower)
+            print('{} {} {} ({:.2f},{:.2f},{:.2f})'.format(status, actor_model, is_waypoint_follower, waypoint_transform.location.x, waypoint_transform.location.y, waypoint_transform.rotation.yaw))
 
         return actor_object, generated_transform
 
