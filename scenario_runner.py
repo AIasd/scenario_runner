@@ -32,7 +32,7 @@ import pkg_resources
 
 import carla
 # addition
-sys.path.append("../carla_09101_no_rss/PythonAPI/carla")
+sys.path.append("../carla_0911_no_rss/PythonAPI/carla")
 from srunner.scenarioconfigs.openscenario_configuration import OpenScenarioConfiguration
 from srunner.scenariomanager.carla_data_provider import CarlaDataProvider
 from srunner.scenariomanager.scenario_manager import ScenarioManager

@@ -241,10 +241,12 @@ class Intersection(BasicScenario):
                 else:
                     is_waypoint_follower = None
 
-                if object_type == 'pedestrian':
-                    simulation_enabled = False
-                else:
-                    simulation_enabled = True
+                # hack for 0.9.9
+                # if object_type == 'pedestrian':
+                #     simulation_enabled = False
+                # else:
+                #     simulation_enabled = True
+                simulation_enabled = True
                 actor, generated_transform = self._request_actor(object_type, object_i.model, spawn_transform_i, simulation_enabled, color, bounds, is_waypoint_follower, center_transform)
 
                 if actor and generated_transform:
@@ -322,8 +324,10 @@ class Intersection(BasicScenario):
 
             if tmp_travel_dist_file:
                 record_travel_dist(self.customized_data['tmp_travel_dist_file'], pedestrian_actor.id, 'pedestrian', i)
-                print('record_travel_dist tmp_travel_dist_file')
-
+                # print('record_travel_dist tmp_travel_dist_file')
+            # print('self.ego_vehicles[0]', self.ego_vehicles[0])
+            # print('pedestrian_actor', pedestrian_actor)
+            # print('pedestrian_info.trigger_distance', pedestrian_info.trigger_distance)
             trigger_distance = InTriggerDistanceToVehicle(self.ego_vehicles[0],
             pedestrian_actor, pedestrian_info.trigger_distance)
 

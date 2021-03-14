@@ -511,6 +511,7 @@ class CarlaDataProvider(object):  # pylint: disable=too-many-public-methods
         """
         This method tries to create a new actor, returning it if successful (None otherwise).
         """
+        # print('create_blueprint', model, rolename, color, actor_category)
         blueprint = CarlaDataProvider.create_blueprint(model, rolename, color, actor_category)
 
         if random_location:
