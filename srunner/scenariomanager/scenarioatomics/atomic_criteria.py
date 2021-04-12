@@ -582,6 +582,7 @@ class CollisionTest(Criterion):
 
         ego_linear_speed = CarlaDataProvider.get_velocity(self.actor)
         other_actor_linear_speed = CarlaDataProvider.get_velocity(event.other_actor)
+        other_actor_location = event.other_actor.get_location()
 
         collision_event = TrafficEvent(event_type=actor_type)
 
@@ -619,16 +620,22 @@ class CollisionTest(Criterion):
             'y': a_y,
             'z': a_z,
             'ego_linear_speed': ego_linear_speed,
+            'other_actor_x': other_actor_location.x,
+            'other_actor_y': other_actor_location.y,
+            'other_actor_z': other_actor_location.z,
             'other_actor_linear_speed': other_actor_linear_speed})
         collision_event.set_message(
-            "Agent collided against object with type={} and id={} at (x={}, y={}, z={}, ego_linear_speed={}, other_actor_linear_speed={})".format(
+            "Agent collided against object with type={} and id={} at (x={}, y={}, z={}, ego_linear_speed={}, other_actor_linear_speed={}), other actor has location at (x={}, y={}, z={})".format(
                 event.other_actor.type_id,
                 event.other_actor.id,
                 a_x,
                 a_y,
                 a_z,
                 ego_linear_speed,
-                other_actor_linear_speed))
+                other_actor_linear_speed,
+                other_actor_location.x,
+                other_actor_location.y,
+                other_actor_location.z))
 
         self.test_status = "FAILURE"
         self.actual_value += 1
