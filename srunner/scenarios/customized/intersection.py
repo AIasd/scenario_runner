@@ -8,9 +8,6 @@ Object crash with prior vehicle action scenario:
 The scenario realizes the user controlled ego vehicle
 moving along the road and encounters a cyclist ahead after taking a right or left turn.
 """
-
-from __future__ import print_function
-
 import math
 import py_trees
 
@@ -24,13 +21,14 @@ from srunner.scenariomanager.timer import TimeOut
 from srunner.scenarios.basic_scenario import BasicScenario
 from srunner.tools.scenario_helper import generate_target_waypoint, generate_target_waypoint_in_route
 
-from customized_utils import visualize_route, perturb_route, add_transform, create_transform, make_hierarchical_dir, copy_transform
-
 from leaderboard.utils.route_manipulation import interpolate_trajectory, downsample_route
 import numpy as np
 from collections import OrderedDict
 import pickle
 import os
+
+from carla_specific_utils.carla_specific_tools import perturb_route, add_transform, create_transform, copy_transform
+from customized_utils import make_hierarchical_dir
 
 def get_generated_transform(added_dist, waypoint):
     """
